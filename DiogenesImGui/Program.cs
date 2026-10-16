@@ -92,13 +92,15 @@ namespace Diogenes
             {
                 app?.Shutdown();
                 OnlineTranslator.Flush();
+
+                // GL objects must be freed while the window's OpenGL context still exists
+                controller?.Dispose();
+                input?.Dispose();
+                gl?.Dispose();
+                controller = null;
             };
 
             window.Run();
-
-            controller?.Dispose();
-            input?.Dispose();
-            gl?.Dispose();
         }
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]

@@ -1,0 +1,53 @@
+name: Build
+
+# Every push builds the app and keeps the zip as a workflow artifact.
+# Pushing a tag like v1.0.0 also publishes it as a GitHub Release.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # 32-bit on purpose: J2534 adapter drivers are almost always 32-bit
+      - name: Publish
+        run: >
+          dotnet publish DiogenesImGui/DiogenesImGui.csproj
+          -c Release -r win-x86 --self-contained true
+          -p:PublishSingleFile=true -p:DebugType=none
+          -o publish
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Copy-Item README.md, LICENSE publish/
+          Compress-Archive -Path publish/* -DestinationPath DiogenesImGui-win-x86.zip
+          Get-ChildItem publish | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DiogenesImGui-win-x86
+          path: publish/
+
+      - name: Create release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${{ github.ref_name }}" DiogenesImGui-win-x86.zip
+          --title "Diogenes ImGui ${{ github.ref_name }}"
+          --notes "Download DiogenesImGui-win-x86.zip, unzip it, and run DiogenesImGui.exe. Keep glfw3.dll and cimgui.dll next to the exe. No .NET install needed. CBF files are not included."

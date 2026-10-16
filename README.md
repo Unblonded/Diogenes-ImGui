@@ -4,6 +4,12 @@ An ImGui front end for [CaesarSuite](https://github.com/jglim/CaesarSuite)'s Dio
 
 It shows everything from the CBF file in plain English.
 
+## Download
+
+Get `DiogenesImGui-win-x86.zip` from the [Releases](../../releases) page, unzip it, and run `DiogenesImGui.exe`. No .NET install is needed. Keep `glfw3.dll` and `cimgui.dll` next to the exe.
+
+To publish a new release, push a version tag: `git tag v1.0.1 && git push origin v1.0.1`.
+
 ## What's different from Diogenes II
 
 - **ImGui interface** (Silk.NET + ImGui.NET) instead of WinForms, scaled to the screen so it stays readable on 4K.

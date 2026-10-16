@@ -435,16 +435,19 @@ namespace Diogenes.UI
                         string preview = match is null ? $"(value {current})" : Tr.Text(match.EnumName, Tr.Kind.Title);
                         if (ImGui.BeginCombo("##enum", preview))
                         {
-                            foreach (var option in pres.BasicEnums)
+                            for (int optionIndex = 0; optionIndex < pres.BasicEnums.Count; optionIndex++)
                             {
+                                var option = pres.BasicEnums[optionIndex];
                                 string optionLabel = Tr.Text(option.EnumName, Tr.Kind.Title);
                                 if (Settings.ShowOriginalNames && Tr.IsTranslated(option.EnumName, optionLabel))
                                 {
                                     optionLabel += $"   [{option.EnumName}]";
                                 }
-                                if (ImGui.Selectable(optionLabel, option == match))
+                                // the index keeps options with the same name from sharing an ImGui ID
+                                if (ImGui.Selectable($"{optionLabel}##opt{optionIndex}", option == match))
                                 {
-                                    BitArrayExtension.CopyBitsClamped(bits, BitArrayExtension.ToBitArray(option.EnumValue, true));
+                                    // sized to the field, same as the number editors, so the value lands in the right bits
+                                    BitArrayExtension.CopyBitsClamped(bits, BitArrayExtension.ToBitArray(option.EnumValue, bigEndian: true, bitArraySize: bits.Length));
                                     Commit(prep, bits);
                                 }
                             }

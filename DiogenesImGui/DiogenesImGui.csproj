@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- J2534 adapter drivers are almost always 32-bit, so this has to stay x86 -->
+    <PlatformTarget>x86</PlatformTarget>
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>diogenes2-256.ico</ApplicationIcon>
+    <RootNamespace>Diogenes</RootNamespace>
+    <AssemblyName>DiogenesImGui</AssemblyName>
+    <NoWarn>CA1416;NETSDK1138</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Silk.NET.Windowing" Version="2.22.0" />
+    <PackageReference Include="Silk.NET.Input" Version="2.22.0" />
+    <PackageReference Include="Silk.NET.OpenGL.Extensions.ImGui" Version="2.22.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CaesarConnection\CaesarConnection.csproj" />
+    <ProjectReference Include="..\Caesar\Caesar.csproj" />
+    <ProjectReference Include="..\Interpreter\Interpreter.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -43,7 +43,7 @@ namespace CaesarConnection.VCI
             throw new Exception($"BaseDevice: unable to create channel");
         }
 
-        public virtual void ReleaseChannel(BaseChannel channel) 
+        public virtual void ReleaseChannel(BaseChannel channel, ParameterSet cp = null)
         {
             Channels.Remove(channel);
             channel.Dispose();

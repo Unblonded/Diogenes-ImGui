@@ -83,7 +83,7 @@ namespace CaesarConnection.Protocol
 
         public virtual void Dispose() 
         {
-            Device.ReleaseChannel(Channel);
+            Device.ReleaseChannel(Channel, ComParameters);
         }
 
 

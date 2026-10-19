@@ -28,6 +28,33 @@ namespace Diogenes.Translation
 
         public static void SetContainer(CaesarContainer container)
         {
+            LoadTables(container, log: true);
+        }
+
+        // Text ids only mean something inside their own CBF. While the returned object is alive, lookups
+        // use this container's tables, for ECUs loaded next to the main one. Main thread only.
+        public static IDisposable Use(CaesarContainer container)
+        {
+            var saved = new SavedTables { German = GermanTable, English = EnglishTable, EnglishName = EnglishTableName };
+            LoadTables(container, log: false);
+            return saved;
+        }
+
+        sealed class SavedTables : IDisposable
+        {
+            public List<string> German, English;
+            public string EnglishName;
+
+            public void Dispose()
+            {
+                GermanTable = German;
+                EnglishTable = English;
+                EnglishTableName = EnglishName;
+            }
+        }
+
+        static void LoadTables(CaesarContainer container, bool log)
+        {
             GermanTable = null;
             EnglishTable = null;
             EnglishTableName = null;
@@ -47,12 +74,28 @@ namespace Diogenes.Translation
                 {
                     EnglishTable = language.StringEntries;
                     EnglishTableName = language.Qualifier;
-                    Console.WriteLine($"This CBF contains an English text table ({language.Qualifier}), using it for translations");
+                    if (log)
+                    {
+                        Console.WriteLine($"This CBF contains an English text table ({language.Qualifier}), using it for translations");
+                    }
                     return;
                 }
             }
-            string available = string.Join(", ", languages.Select(x => x.Qualifier));
-            Console.WriteLine($"CBF text languages: {available}. Translating German text automatically.");
+            if (log)
+            {
+                string available = string.Join(", ", languages.Select(x => x.Qualifier));
+                Console.WriteLine($"CBF text languages: {available}. Translating German text automatically.");
+            }
+        }
+
+        // English text straight from the CBF's own English table, or null when it has none for this id
+        public static string OfficialEnglish(int ctfId)
+        {
+            if (Enabled && EnglishTable != null && ctfId >= 0 && ctfId < EnglishTable.Count && !string.IsNullOrWhiteSpace(EnglishTable[ctfId]))
+            {
+                return EnglishTable[ctfId];
+            }
+            return null;
         }
 
         // guards against a table that was read from the same offset as the German one

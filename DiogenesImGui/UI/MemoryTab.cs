@@ -68,7 +68,7 @@ namespace Diogenes.UI
             ImGui.SameLine();
             if (Widgets.ColoredButton("Write to ECU", Theme.Bad, new Vector2(Widgets.S(150), 0), canTransfer && Buffer.Length > 0))
             {
-                App.Confirm("Write memory?", $"This writes {Buffer.Length} bytes to the ECU at 0x{BufferAddress:X8}. Only changed {ChunkSize}-byte chunks are sent if the data was read from the ECU first.\n\nA wrong write can make the ECU stop working.", StartWrite);
+                App.ConfirmDangerous("Write memory?", $"This writes {Buffer.Length} bytes to the ECU at 0x{BufferAddress:X8}. Only changed {ChunkSize}-byte chunks are sent if the data was read from the ECU first.\n\nA wrong write can make the ECU stop working.", StartWrite);
             }
             if (!canTransfer) Widgets.Tooltip(reason);
             ImGui.SameLine();

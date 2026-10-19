@@ -18,6 +18,12 @@ namespace CaesarConnection.VCI.Channel
         CancellationTokenSource MessageLoopCancellationToken = new CancellationTokenSource();
         bool disposed = false;
 
+        // one flow control filter per ECU using this channel: response id -> J2534 filter id
+        readonly Dictionary<int, int> EcuFilters = new Dictionary<int, int>();
+        readonly object FilterLock = new object();
+        readonly object TxLock = new object();
+        public int Baudrate { get; private set; }
+
         public J2534Channel(Device PhysicalDevice, ParameterSet cp) 
         {
             TraceStopwatch.Start();
@@ -25,12 +31,14 @@ namespace CaesarConnection.VCI.Channel
             ComParams = cp;
             Console.WriteLine($"Opening J2534Channel");
             int baudrate = (int)ComParams.GetParameter(CP.Baudrate);
+            Baudrate = baudrate;
 
             // ISOTP mode and ConnectFlag.CAN_ID_BOTH are currently hardcoded, need to check if this is fetched from comparam
             PhysicalChannel = PhysicalDevice.GetChannel(SAE.J2534.Protocol.ISO15765, (Baud)baudrate, ConnectFlag.CAN_ID_BOTH);
             Console.WriteLine($"Target Voltage: {PhysicalChannel.MeasureBatteryVoltage()} mV");
 
-            SetJ2534Filter();
+            PhysicalChannel.ClearMsgFilters();
+            AddEcu(cp);
             SetIsoTpTimings();
 
             PhysicalChannel.ClearRxBuffer();
@@ -55,10 +63,11 @@ namespace CaesarConnection.VCI.Channel
             }
         }
 
-        private void SetJ2534Filter() 
+        // starts listening to another ECU on this channel (returns quietly if it already is)
+        public void AddEcu(ParameterSet ecuParams)
         {
-            int requestId = (int)ComParams.GetParameter(CP.CanPhysReqId);
-            int responseId = (int)ComParams.GetParameter(CP.CanRespUSDTId);
+            int requestId = (int)ecuParams.GetParameter(CP.CanPhysReqId);
+            int responseId = (int)ecuParams.GetParameter(CP.CanRespUSDTId);
             byte[] reqIdBytes = new byte[4];
             byte[] respIdBytes = new byte[4];
             BinaryPrimitives.WriteInt32BigEndian(reqIdBytes, requestId);
@@ -71,10 +80,39 @@ namespace CaesarConnection.VCI.Channel
             filter.FlowControl = reqIdBytes;
             filter.TxFlags = TxFlag.ISO15765_FRAME_PAD;
 
-            PhysicalChannel.ClearMsgFilters();
-            PhysicalChannel.StartMsgFilter(filter);
+            lock (FilterLock)
+            {
+                if (EcuFilters.ContainsKey(responseId))
+                {
+                    return;
+                }
+                EcuFilters[responseId] = PhysicalChannel.StartMsgFilter(filter);
+            }
 
             Console.WriteLine($"Configured filter, Pattern {BitConverter.ToString(respIdBytes)},  FlowControl {BitConverter.ToString(reqIdBytes)}");
+        }
+
+        // stops listening to an ECU; returns true while other ECUs still use the channel
+        public bool RemoveEcu(ParameterSet ecuParams)
+        {
+            int responseId = (int)ecuParams.GetParameter(CP.CanRespUSDTId);
+            lock (FilterLock)
+            {
+                if (EcuFilters.Count > 1 && EcuFilters.TryGetValue(responseId, out int filterId))
+                {
+                    try
+                    {
+                        PhysicalChannel.StopMsgFilter(filterId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Could not remove filter: {ex.Message}");
+                    }
+                    EcuFilters.Remove(responseId);
+                    return true;
+                }
+                return false;
+            }
         }
 
         public void SetIsoTpTimings()
@@ -127,7 +165,11 @@ namespace CaesarConnection.VCI.Channel
             try
             {
                 Message msg = new Message(e.Request, TxFlag.ISO15765_FRAME_PAD);
-                PhysicalChannel.SendMessage(msg);
+                // several ECUs (and their tester present timers) can share this channel
+                lock (TxLock)
+                {
+                    PhysicalChannel.SendMessage(msg);
+                }
             }
             catch (Exception ex) 
             {

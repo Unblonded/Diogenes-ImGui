@@ -58,7 +58,6 @@ namespace Diogenes.UI
         string ResultStatus = null;
         Vector4 ResultColor;
         string ResultRaw = null;
-        bool SkipConfirmThisSession = false;
 
         public CommandsTab(App app)
         {
@@ -578,12 +577,12 @@ namespace Diogenes.UI
                 App.ShowMessage("Check the inputs", "One or more inputs are not valid (shown in red). Fix them before running.");
                 return;
             }
-            if (IsSafe(Selected.Category) || SkipConfirmThisSession)
+            if (IsSafe(Selected.Category))
             {
                 Execute();
                 return;
             }
-            App.Confirm($"Run \"{Selected.Name}\"?",
+            App.ConfirmDangerous($"Run \"{Selected.Name}\"?",
                 $"{Label(Selected.Category)}: {Explanation(Selected.Category)}\n\nOnly continue if you know what this command does to your car.",
                 Execute);
         }
@@ -737,10 +736,6 @@ namespace Diogenes.UI
                 ImGui.TextDisabled("Full answer:");
                 ImGui.SameLine();
                 ImGui.TextWrapped(ResultRaw);
-            }
-            if (!IsSafe(Selected.Category) && App.Connected)
-            {
-                ImGui.Checkbox("Don't ask again before running commands (until restart)", ref SkipConfirmThisSession);
             }
         }
     }

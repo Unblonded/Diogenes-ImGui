@@ -26,10 +26,12 @@ namespace Diogenes
         // Vitals tab
         public bool UsUnits { get; set; } = false;
         public float VitalsInterval { get; set; } = 1f;
-        // "ECU|vital id" -> chosen value key, "" hides the vital
+        // vital id -> chosen value key ("ECU|command|value|bit"), "" hides the vital
         public Dictionary<string, string> VitalSources { get; set; } = new Dictionary<string, string>();
-        // ECU qualifier -> extra values the user added to the dashboard
-        public Dictionary<string, List<string>> VitalPins { get; set; } = new Dictionary<string, List<string>>();
+        // values the user added to the dashboard ("ECU|command|value|bit")
+        public List<string> PinnedValues { get; set; } = new List<string>();
+        // CBFs loaded next to the main one for the Vitals tab
+        public List<string> ExtraCbfFiles { get; set; } = new List<string>();
 
         public static AppSettings Current { get; private set; } = Load();
 

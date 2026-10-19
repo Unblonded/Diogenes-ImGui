@@ -13,7 +13,9 @@ namespace Diogenes
         public class Fault
         {
             public string Code;
-            public string Meaning;
+            public string Meaning;      // filled in on the main thread from Dtc, see VitalsTab
+            public DTC Dtc;             // matching code in the CBF, null when it isn't listed
+            public string EcuName;
             public byte Status;
             public bool Active;
             public bool Pending;
@@ -48,10 +50,9 @@ namespace Diogenes
         }
 
         // runs on a background thread
-        public static Result Read(ECU ecu, IEnumerable<DTC> knownCodes)
+        public static Result Read(CaesarConnection.Protocol.BaseProtocol channel, ECU ecu, IEnumerable<DTC> knownCodes)
         {
             var result = new Result();
-            var channel = DiogenesSharedContext.Singleton.Channel;
             if (channel is null)
             {
                 result.Error = "Not connected";
@@ -80,6 +81,12 @@ namespace Diogenes
                 for (int i = 3; i + 3 < response.Length; i += 4)
                 {
                     byte status = response[i + 3];
+                    // many ECUs list every code they support with only "test not completed" bits set,
+                    // only keep codes that actually failed: now, this cycle, pending or confirmed
+                    if ((status & 0x0F) == 0)
+                    {
+                        continue;
+                    }
                     string sae = Sae(response[i], response[i + 1]);
                     var fault = new Fault
                     {
@@ -88,7 +95,8 @@ namespace Diogenes
                         Active = (status & 0x01) != 0,
                         Pending = (status & 0x04) != 0 && (status & 0x08) == 0,
                     };
-                    fault.Meaning = Lookup(lookup, fault.Code, sae, $"{response[i]:X2}{response[i + 1]:X2}{response[i + 2]:X2}", $"{response[i]:X2}{response[i + 1]:X2}");
+                    fault.Dtc = Lookup(lookup, fault.Code, sae,$"{response[i]:X2}{response[i + 1]:X2}{response[i + 2]:X2}", $"{response[i]:X2}{response[i + 1]:X2}");
+                    fault.EcuName = ecu.Qualifier;
                     result.Faults.Add(fault);
                 }
             }
@@ -98,16 +106,24 @@ namespace Diogenes
                 for (int i = 2; i + 2 < response.Length; i += 3)
                 {
                     byte status = response[i + 2];
+                    // KWP storage state in bits 5-6: 00 nothing detected, 01 stored but not present,
+                    // 10 maturing (intermittent), 11 present right now
+                    int storage = (status >> 5) & 0x03;
+                    if (storage == 0)
+                    {
+                        continue;
+                    }
                     string hex = $"{response[i]:X2}{response[i + 1]:X2}";
                     string sae = Sae(response[i], response[i + 1]);
                     var fault = new Fault
                     {
                         Code = sae,
                         Status = status,
-                        // KWP: bits 5-6 = 01 means the fault is present right now
-                        Active = ((status >> 5) & 0x03) == 0x01,
+                        Active = storage == 0x03,
+                        Pending = storage == 0x02,
                     };
-                    fault.Meaning = Lookup(lookup, sae, hex);
+                    fault.Dtc = Lookup(lookup, sae, hex);
+                    fault.EcuName = ecu.Qualifier;
                     result.Faults.Add(fault);
                 }
             }
@@ -147,13 +163,13 @@ namespace Diogenes
             return lookup;
         }
 
-        static string Lookup(Dictionary<string, DTC> lookup, params string[] candidates)
+        static DTC Lookup(Dictionary<string, DTC> lookup, params string[] candidates)
         {
             foreach (string c in candidates)
             {
                 if (lookup.TryGetValue(c, out var dtc))
                 {
-                    return Tr.Ctf(dtc.Description_CTF);
+                    return dtc;
                 }
             }
             return null;

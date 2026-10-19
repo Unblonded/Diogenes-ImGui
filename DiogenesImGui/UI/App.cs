@@ -23,16 +23,18 @@ namespace Diogenes.UI
 
         readonly VitalsTab Vitals;
         readonly CommandsTab Commands;
-        readonly CodingTab Coding;
         readonly FaultCodesTab FaultCodes;
         readonly MemoryTab Memory;
-        readonly FlashTab Flash;
 
         BaseDevice[] Devices = new BaseDevice[] { };
         int SelectedDevice = -1;
         List<string> Interfaces = new List<string>();
         int SelectedInterface = -1;
-        string LoadedCbfPath = null;
+        public string LoadedCbfPath { get; private set; } = null;
+
+        // the main CBF as an ECU slot (null when none is open), plus the extra ones for the Vitals tab
+        public EcuSlot PrimarySlot { get; private set; } = null;
+        public IEnumerable<EcuSlot> EcuSlots => PrimarySlot is null ? Ctx.ExtraEcus : new[] { PrimarySlot }.Concat(Ctx.ExtraEcus);
 
         // one background operation at a time (connecting, running a command, reading memory, flashing)
         volatile bool busy = false;
@@ -51,6 +53,9 @@ namespace Diogenes.UI
         string ConfirmBody = null;
         Action ConfirmAction = null;
         bool OpenConfirmPopup = false;
+        string ConfirmYesLabel = "Yes, continue";
+        bool ConfirmFinalStep = false;
+        double ConfirmUnlockTime = 0;
 
         bool PopupOpenDummy = true;
         bool ShowQuickStart = false;
@@ -68,10 +73,8 @@ namespace Diogenes.UI
             Log = log;
             Vitals = new VitalsTab(this);
             Commands = new CommandsTab(this);
-            Coding = new CodingTab(this);
             FaultCodes = new FaultCodesTab(this);
             Memory = new MemoryTab(this);
-            Flash = new FlashTab(this);
 
             Console.WriteLine("Diogenes II (ImGui edition). Start by opening a CBF file for the control unit you want to talk to.");
             RefreshDevices();
@@ -83,6 +86,10 @@ namespace Diogenes.UI
             else if (!string.IsNullOrEmpty(commandLinePath))
             {
                 LoadCbf(commandLinePath);
+            }
+            foreach (string path in Settings.ExtraCbfFiles.ToList())
+            {
+                AddExtraCbf(path, save: false);
             }
             ShowQuickStart = !CbfLoaded && Settings.RecentCbfFiles.Count == 0;
         }
@@ -148,7 +155,31 @@ namespace Diogenes.UI
             ConfirmTitle = title;
             ConfirmBody = body;
             ConfirmAction = onYes;
+            ConfirmYesLabel = "Yes, continue";
+            ConfirmFinalStep = false;
             OpenConfirmPopup = true;
+        }
+
+        // for anything that changes the car: asks once, then a second time with the buttons swapped and
+        // the yes button locked for a few seconds, so a quick double-click can't get through both
+        public void ConfirmDangerous(string title, string body, Action onYes)
+        {
+            Confirm(title, body, () =>
+            {
+                ConfirmTitle = "Are you absolutely sure?";
+                ConfirmBody = $"{title}\n\nThis changes something in the car and may not be reversible. Check that the ignition is on, the battery is charged and you know what this does.";
+                ConfirmAction = onYes;
+                ConfirmYesLabel = "Yes, send it";
+                ConfirmFinalStep = true;
+                ConfirmUnlockTime = ImGui.GetTime() + 3;
+                OpenConfirmPopup = true;
+            });
+        }
+
+        // services that only read (or keep the session alive) and are safe to send from the raw console
+        static bool IsReadOnlyRequest(byte[] request)
+        {
+            return request.Length > 0 && request[0] is 0x22 or 0x21 or 0x1A or 0x19 or 0x18 or 0x17 or 0x23 or 0x3E;
         }
 
         // ---------------------------------------------------------------- CBF / connection logic
@@ -194,6 +225,13 @@ namespace Diogenes.UI
         {
             Ctx.PrimaryContainer = container;
             LoadedCbfPath = path;
+            PrimarySlot = EcuSlot.ForPrimary(path);
+
+            // the same ECU can't be both the main one and an extra
+            foreach (var duplicate in Ctx.ExtraEcus.Where(x => x.Name == container.CaesarECUs[0].Qualifier).ToList())
+            {
+                RemoveExtraCbf(duplicate);
+            }
             Tr.SetContainer(Ctx.PrimaryContainer);
             RefreshInterfaces();
 
@@ -209,6 +247,7 @@ namespace Diogenes.UI
             Ctx.PreConnectParameters.Clear();
             Ctx.PrimaryContainer = null;
             LoadedCbfPath = null;
+            PrimarySlot = null;
             Tr.SetContainer(null);
             RefreshInterfaces();
             NotifyCbfOrVariantChange();
@@ -314,6 +353,10 @@ namespace Diogenes.UI
                 {
                     IdentifyEcuVariant();
                 }
+                foreach (var extra in Ctx.ExtraEcus.ToList())
+                {
+                    ConnectExtra(extra);
+                }
             }, NotifyCbfOrVariantChange);
         }
 
@@ -341,9 +384,97 @@ namespace Diogenes.UI
             }
         }
 
+        // background thread
+        void ConnectExtra(EcuSlot slot)
+        {
+            slot.Connect(Ctx.Connection, Trace);
+            if (slot.Error is null)
+            {
+                Console.WriteLine($"Also connected to {slot.Name}" + (slot.Variant is null ? "" : $" ({slot.Variant.Qualifier})"));
+            }
+            else
+            {
+                Console.WriteLine($"Could not connect to {slot.Name}: {slot.Error}");
+            }
+        }
+
+        // loads another CBF next to the main one so the Vitals tab can read that ECU too
+        public void AddExtraCbf(string path, bool save = true)
+        {
+            if (!File.Exists(path))
+            {
+                Console.WriteLine($"Extra CBF file could not be found at {path}");
+                Settings.ExtraCbfFiles.Remove(path);
+                Settings.Save();
+                return;
+            }
+            EcuSlot slot;
+            try
+            {
+                slot = EcuSlot.Load(path);
+            }
+            catch (Exception ex)
+            {
+                ShowMessage("Could not open file", $"{Path.GetFileName(path)} could not be read as a CBF file:\n{ex.Message}");
+                return;
+            }
+            if (EcuSlots.Any(x => x.Name == slot.Name))
+            {
+                Console.WriteLine($"{slot.Name} is already loaded");
+                return;
+            }
+            Ctx.ExtraEcus.Add(slot);
+            if (save && !Settings.ExtraCbfFiles.Contains(path))
+            {
+                Settings.ExtraCbfFiles.Add(path);
+                Settings.Save();
+            }
+            string description;
+            using (Tr.Use(slot.Container))
+            {
+                description = Tr.Ctf(slot.Ecu.EcuDescription_CTF, Tr.Kind.Sentence).Split('\n')[0].Trim();
+            }
+            Console.WriteLine($"Added {Path.GetFileName(path)}: {slot.Name} - {description}");
+            NotifyCbfOrVariantChange();
+            if (Connected)
+            {
+                RunBackground($"Connecting to {slot.Name}", () => ConnectExtra(slot), NotifyCbfOrVariantChange);
+            }
+        }
+
+        public void RemoveExtraCbf(EcuSlot slot)
+        {
+            Ctx.ExtraEcus.Remove(slot);
+            Settings.ExtraCbfFiles.Remove(slot.Path);
+            Settings.Save();
+            if (slot.Connected)
+            {
+                if (!RunBackground($"Disconnecting {slot.Name}", slot.Disconnect))
+                {
+                    // something else is using the connection, the slot is closed with the connection instead
+                    Console.WriteLine($"{slot.Name} will be disconnected with the rest");
+                }
+            }
+            NotifyCbfOrVariantChange();
+        }
+
+        public void OpenExtraCbfDialog()
+        {
+            string path = FileDialogs.OpenFile("Add another control unit's CBF file", "CBF files (*.cbf)|*.cbf|All files (*.*)|*.*");
+            if (path != null)
+            {
+                AddExtraCbf(path);
+            }
+        }
+
         public void CloseConnection()
         {
             bool wasConnected = Ctx.Channel != null;
+            // extra ECUs share the main connection, so they close first
+            foreach (var extra in Ctx.ExtraEcus.ToList())
+            {
+                extra.Disconnect();
+            }
             Ctx.PrimaryVariant = null;
             try
             {
@@ -373,7 +504,6 @@ namespace Diogenes.UI
         {
             Vitals.NotifyCbfOrVariantChange();
             Commands.NotifyCbfOrVariantChange();
-            Coding.NotifyCbfOrVariantChange();
             FaultCodes.NotifyCbfOrVariantChange();
         }
 
@@ -417,7 +547,7 @@ namespace Diogenes.UI
 
             if (LogHeight < 0)
             {
-                LogHeight = Widgets.S(220);
+                LogHeight = Widgets.S(150);
             }
             float splitterHeight = Widgets.S(6);
             float workHeight = ImGui.GetContentRegionAvail().Y - LogHeight - splitterHeight;
@@ -455,6 +585,16 @@ namespace Diogenes.UI
             {
                 return;
             }
+            Fonts.Push(Fonts.Semibold);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.Accent);
+            ImGui.TextUnformatted(Icons.Car);
+            ImGui.PopStyleColor();
+            ImGui.SameLine();
+            ImGui.TextUnformatted("DIOGENES");
+            Fonts.Pop();
+            ImGui.SameLine();
+            ImGui.TextDisabled("|");
+            ImGui.SameLine();
             if (ImGui.BeginMenu("File"))
             {
                 if (ImGui.MenuItem("Open CBF file...", "Ctrl+O"))
@@ -566,15 +706,15 @@ namespace Diogenes.UI
 
         void DrawSetupBar()
         {
-            float cardHeight = ImGui.GetTextLineHeightWithSpacing() * 4.2f;
-            if (!ImGui.BeginTable("setup", 3, ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.BordersInnerV))
+            float cardHeight = ImGui.GetTextLineHeightWithSpacing() * 4.6f;
+            if (!ImGui.BeginTable("setup", 3, ImGuiTableFlags.SizingStretchSame))
             {
                 return;
             }
 
             // step 1: CBF
             ImGui.TableNextColumn();
-            ImGui.BeginChild("step1", new Vector2(0, cardHeight));
+            Widgets.BeginCard("step1", new Vector2(0, cardHeight));
             StepTitle(1, "Control unit file (CBF)", CbfLoaded);
             Widgets.Help("A CBF file describes one control unit (ECU) in the car: which commands it understands and how to read its answers. You need the one that matches the ECU you want to talk to (e.g. IC_204.CBF for the instrument cluster).");
             if (CbfLoaded)
@@ -585,23 +725,23 @@ namespace Diogenes.UI
                 string firstLine = description.Split('\n')[0].Trim();
                 ImGui.TextUnformatted(ecu.Qualifier + (firstLine.Length == 0 ? "" : $"  -  {firstLine}"));
                 Widgets.Tooltip($"{LoadedCbfPath}\n\n{description}");
-                if (ImGui.Button("Open a different file..."))
+                if (ImGui.Button($"{Icons.Open}  Open a different file..."))
                 {
                     OpenCbfDialog();
                 }
             }
             else
             {
-                if (Widgets.ColoredButton("Open CBF file...", Theme.Accent))
+                if (Widgets.PrimaryButton($"{Icons.Open}  Open CBF file...", Theme.Accent))
                 {
                     OpenCbfDialog();
                 }
             }
-            ImGui.EndChild();
+            Widgets.EndCard();
 
             // step 2: adapter
             ImGui.TableNextColumn();
-            ImGui.BeginChild("step2", new Vector2(0, cardHeight));
+            Widgets.BeginCard("step2", new Vector2(0, cardHeight));
             StepTitle(2, "Adapter", SelectedDevice >= 0);
             Widgets.Help("The interface cable between this PC and the car's OBD port. Any J2534 pass-thru device should work (e.g. OpenPort 2.0). Its driver must be installed.");
             ImGui.BeginDisabled(Connected || busy);
@@ -628,16 +768,16 @@ namespace Diogenes.UI
                 }
                 ImGui.SameLine();
             }
-            if (ImGui.Button("Refresh"))
+            if (ImGui.Button($"{Icons.Refresh}  Refresh"))
             {
                 RefreshDevices();
             }
             ImGui.EndDisabled();
-            ImGui.EndChild();
+            Widgets.EndCard();
 
             // step 3: connect
             ImGui.TableNextColumn();
-            ImGui.BeginChild("step3", new Vector2(0, cardHeight));
+            Widgets.BeginCard("step3", new Vector2(0, cardHeight));
             StepTitle(3, "Connect to the car", Connected);
             Widgets.Help("Turn the ignition on, then connect. 'Connection type' comes from the CBF file; the first one is usually right.");
             ImGui.BeginDisabled(Connected || busy || !CbfLoaded);
@@ -658,7 +798,7 @@ namespace Diogenes.UI
             ImGui.SameLine();
             if (Connected)
             {
-                if (Widgets.ColoredButton("Disconnect", Theme.Bad, new Vector2(-1, 0), (!busy || busyQuiet) && !PendingDisconnect))
+                if (Widgets.ColoredButton($"{Icons.Close}  Disconnect", Theme.Bad, new Vector2(-1, 0), (!busy || busyQuiet) && !PendingDisconnect))
                 {
                     if (busy)
                     {
@@ -672,7 +812,7 @@ namespace Diogenes.UI
             }
             else
             {
-                if (Widgets.ColoredButton("Connect", Theme.Good, new Vector2(-1, 0), !busy && CbfLoaded && SelectedDevice >= 0))
+                if (Widgets.PrimaryButton($"{Icons.Plug}  Connect", Theme.Good, new Vector2(-1, 0), !busy && CbfLoaded && SelectedDevice >= 0))
                 {
                     Connect();
                 }
@@ -685,7 +825,7 @@ namespace Diogenes.UI
             }
             else if (Connected)
             {
-                Widgets.StatusDot(Theme.Good);
+                Widgets.StatusDot(Theme.Good, pulse: Vitals.IsLive);
                 string variant = Ctx.PrimaryVariant is null ? "version unknown" : VariantName(Ctx.PrimaryVariant);
                 ImGui.TextUnformatted($"Connected  |  {variant}" + (Vitals.IsLive ? "  |  live" : ""));
                 Widgets.Tooltip("The 'version' (variant) is the exact software version of the ECU. Commands for the right version are shown when it is known.");
@@ -695,23 +835,42 @@ namespace Diogenes.UI
                 Widgets.StatusDot(Theme.Dim);
                 ImGui.TextDisabled("Not connected");
             }
-            ImGui.EndChild();
+            Widgets.EndCard();
 
             ImGui.EndTable();
         }
 
+        // numbered circle that turns into a green check once the step is done
         static void StepTitle(int number, string title, bool done)
         {
-            Widgets.StatusDot(done ? Theme.Good : Theme.Dim);
-            ImGui.PushStyleColor(ImGuiCol.Text, done ? Theme.Good : Theme.Accent);
-            ImGui.TextUnformatted($"Step {number}: {title}");
-            ImGui.PopStyleColor();
+            var color = done ? Theme.Good : Theme.Accent;
+            float d = ImGui.GetTextLineHeight() * 1.25f;
+            var draw = ImGui.GetWindowDrawList();
+            var pos = ImGui.GetCursorScreenPos();
+            var center = pos + new Vector2(d * 0.5f);
+            draw.AddCircleFilled(center, d * 0.5f, Theme.U32(Theme.WithAlpha(color, 0.16f)));
+            draw.AddCircle(center, d * 0.5f, Theme.U32(Theme.WithAlpha(color, 0.6f)), 0, Widgets.S(1.2f));
+            string mark = done ? Icons.Check : number.ToString();
+            var markSize = ImGui.CalcTextSize(mark);
+            draw.AddText(center - markSize * 0.5f, Theme.U32(color), mark);
+            ImGui.Dummy(new Vector2(d));
+            ImGui.SameLine();
+            ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (d - ImGui.GetTextLineHeight()) * 0.5f);
+            Fonts.Push(Fonts.Semibold);
+            ImGui.TextUnformatted(title);
+            Fonts.Pop();
         }
 
         void DrawQuickStart()
         {
             ImGui.Spacing();
-            Widgets.BigText("Welcome to Diogenes", 1.6f);
+            Fonts.Push(Fonts.Title);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.Accent);
+            ImGui.TextUnformatted(Icons.Car);
+            ImGui.PopStyleColor();
+            ImGui.SameLine();
+            ImGui.TextUnformatted("Welcome to Diogenes");
+            Fonts.Pop();
             ImGui.Spacing();
             ImGui.TextWrapped("This tool talks to Mercedes-Benz control units (ECUs) through a J2534 adapter, using the ECU's CBF file. Everything shown from the CBF file is translated from German to English automatically.");
             ImGui.Spacing();
@@ -723,9 +882,9 @@ namespace Diogenes.UI
             ImGui.BulletText("For anything else use the Commands tab: search for what you want, pick it, and press Run.");
             ImGui.Spacing();
             Widgets.Heading("Good to know");
-            ImGui.BulletText("Each CBF file is one control unit: open the engine ECU's file for coolant and oil, the transmission's for fluid temperature.");
-            ImGui.BulletText("You can browse a CBF file without a car connected: commands, coding options and fault codes are all visible.");
-            ImGui.BulletText("Green commands only read data. Yellow/red ones change something in the car and will ask before running.");
+            ImGui.BulletText("Each CBF file is one control unit. On the Vitals tab you can add more (e.g. engine + transmission) and read them all at once; it tells you which ones you still need.");
+            ImGui.BulletText("You can browse a CBF file without a car connected: all of its commands are visible.");
+            ImGui.BulletText("Green commands only read data. Yellow/red ones change something in the car and ask twice before running.");
             ImGui.BulletText("View > Show original German names shows the untranslated names next to the English ones.");
             ImGui.BulletText("View > Advanced mode shows raw bytes, bit positions, connection parameters and a raw command console.");
             ImGui.Spacing();
@@ -743,7 +902,7 @@ namespace Diogenes.UI
                 ImGui.Spacing();
             }
 
-            if (Widgets.ColoredButton("Open CBF file...", Theme.Accent, new Vector2(Widgets.S(220), 0)))
+            if (Widgets.PrimaryButton($"{Icons.Open}  Open CBF file...", Theme.Accent, new Vector2(Widgets.S(220), 0)))
             {
                 OpenCbfDialog();
             }
@@ -763,24 +922,30 @@ namespace Diogenes.UI
             {
                 return;
             }
-            TabItem(0, "Vitals", Vitals.Draw);
-            TabItem(1, "Commands", Commands.Draw);
-            TabItem(2, "Coding", Coding.Draw);
-            TabItem(3, "Fault codes", FaultCodes.Draw);
-            TabItem(4, "Memory", Memory.Draw);
-            TabItem(5, "Flash", Flash.Draw);
+            TabItem(0, $"{Icons.Heart}  Vitals", Vitals.Draw);
+            TabItem(1, $"{Icons.Terminal}  Commands", Commands.Draw);
+            TabItem(4, $"{Icons.Chip}  Memory", Memory.Draw);
             if (Settings.AdvancedMode)
             {
-                TabItem(6, "Settings", DrawSettingsTab);
+                // every code the CBF defines, not what's stored in the car (that's on the Vitals tab)
+                TabItem(3, $"{Icons.Search}  Fault code lookup", FaultCodes.Draw);
+                TabItem(6, $"{Icons.Cog}  Settings", DrawSettingsTab);
             }
             ImGui.EndTabBar();
         }
 
         void TabItem(int index, string label, Action draw)
         {
-            if (ImGui.BeginTabItem(label))
+            ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(Widgets.S(16), Widgets.S(8)));
+            Fonts.Push(Fonts.Semibold);
+            bool open = ImGui.BeginTabItem(label);
+            Fonts.Pop();
+            ImGui.PopStyleVar();
+            if (open)
             {
+                ImGui.PushStyleColor(ImGuiCol.ChildBg, Vector4.Zero);
                 ImGui.BeginChild($"tab{index}", Vector2.Zero);
+                ImGui.PopStyleColor();
                 draw();
                 ImGui.EndChild();
                 ImGui.EndTabItem();
@@ -850,7 +1015,7 @@ namespace Diogenes.UI
 
         void DrawLogPanel()
         {
-            ImGui.BeginChild("log", Vector2.Zero, ImGuiChildFlags.Border);
+            Widgets.BeginCard("log", Vector2.Zero);
             if (ImGui.BeginTabBar("logtabs"))
             {
                 if (ImGui.BeginTabItem("Messages"))
@@ -865,7 +1030,7 @@ namespace Diogenes.UI
                 }
                 ImGui.EndTabBar();
             }
-            ImGui.EndChild();
+            Widgets.EndCard();
         }
 
         void DrawLogLines(LogBuffer buffer, ref int lastVersion, bool translate)
@@ -873,7 +1038,7 @@ namespace Diogenes.UI
             bool showConsole = Settings.AdvancedMode && buffer == Log;
             float footer = showConsole ? ImGui.GetFrameHeightWithSpacing() : 0;
 
-            if (ImGui.SmallButton("Copy all"))
+            if (ImGui.SmallButton($"{Icons.Copy}  Copy all"))
             {
                 ImGui.SetClipboardText(string.Join(Environment.NewLine, buffer.Snapshot()));
             }
@@ -883,7 +1048,10 @@ namespace Diogenes.UI
                 buffer.Clear();
             }
 
+            ImGui.PushStyleColor(ImGuiCol.ChildBg, Vector4.Zero);
             ImGui.BeginChild("lines", new Vector2(0, -footer), ImGuiChildFlags.None, ImGuiWindowFlags.HorizontalScrollbar);
+            ImGui.PopStyleColor();
+            Fonts.Push(Fonts.Mono);
             var lines = buffer.Snapshot();
             unsafe
             {
@@ -914,6 +1082,7 @@ namespace Diogenes.UI
                 lastVersion = buffer.Version;
                 ImGui.SetScrollHereY(1.0f);
             }
+            Fonts.Pop();
             ImGui.EndChild();
 
             if (showConsole)
@@ -927,12 +1096,20 @@ namespace Diogenes.UI
                     ImGui.SetKeyboardFocusHere(-1);
                     if (BitUtility.TryParseHex(text, out byte[] request))
                     {
-                        RunBackground("Sending", () =>
+                        void Send() => RunBackground("Sending", () =>
                         {
                             Console.WriteLine($"REQ: {BitUtility.BytesToHex(request, true)}");
                             byte[] response = Ctx.Channel.Send(request, true);
                             Console.WriteLine($"ECU: {BitUtility.BytesToHex(response, true)}");
                         });
+                        if (IsReadOnlyRequest(request))
+                        {
+                            Send();
+                        }
+                        else
+                        {
+                            ConfirmDangerous($"Send {BitUtility.BytesToHex(request, true)}?", "This raw request is not a plain read. It may write, reset or reprogram the ECU.", Send);
+                        }
                     }
                     else
                     {
@@ -971,19 +1148,39 @@ namespace Diogenes.UI
             ImGui.SetNextWindowSize(new Vector2(Widgets.S(560), 0));
             if (ImGui.BeginPopupModal("##confirm", ref PopupOpenDummy, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoTitleBar))
             {
+                if (ConfirmFinalStep)
+                {
+                    Widgets.Pill($"{Icons.Warning}  Step 2 of 2", Theme.Bad);
+                }
                 Widgets.BigText(ConfirmTitle ?? "", 1.2f);
                 ImGui.Separator();
                 ImGui.TextWrapped(ConfirmBody ?? "");
                 ImGui.Spacing();
-                if (Widgets.ColoredButton("Yes, continue", Theme.Warn, new Vector2(Widgets.S(160), 0)))
+
+                bool yes = false, cancel = false;
+                double wait = ConfirmUnlockTime - ImGui.GetTime();
+                if (ConfirmFinalStep)
+                {
+                    // cancel where "yes" was on the first dialog
+                    cancel = ImGui.Button("Cancel", new Vector2(Widgets.S(160), 0));
+                    ImGui.SameLine();
+                    string label = wait > 0 ? $"{ConfirmYesLabel} ({Math.Ceiling(wait)})" : ConfirmYesLabel;
+                    yes = Widgets.PrimaryButton($"{label}##yes", Theme.Bad, new Vector2(Widgets.S(200), 0), wait <= 0);
+                }
+                else
+                {
+                    yes = Widgets.ColoredButton(ConfirmYesLabel, Theme.Warn, new Vector2(Widgets.S(160), 0));
+                    ImGui.SameLine();
+                    cancel = ImGui.Button("Cancel", new Vector2(Widgets.S(120), 0));
+                }
+                if (yes)
                 {
                     ImGui.CloseCurrentPopup();
                     var action = ConfirmAction;
                     ConfirmAction = null;
                     action?.Invoke();
                 }
-                ImGui.SameLine();
-                if (ImGui.Button("Cancel", new Vector2(Widgets.S(120), 0)) || ImGui.IsKeyPressed(ImGuiKey.Escape))
+                else if (cancel || ImGui.IsKeyPressed(ImGuiKey.Escape))
                 {
                     ConfirmAction = null;
                     ImGui.CloseCurrentPopup();

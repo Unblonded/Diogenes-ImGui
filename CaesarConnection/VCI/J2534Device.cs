@@ -43,10 +43,29 @@ namespace CaesarConnection.VCI
 
         public override BaseChannel CreateChannel(ParameterSet cp, System.IO.TextWriter traceWriter)
         {
+            // J2534 adapters allow one ISO15765 channel at a time, so a second ECU on the same bus
+            // shares the open channel with its own flow control filter
+            int baudrate = (int)cp.GetParameter(CP.Baudrate);
+            var shared = Channels.OfType<J2534Channel>().FirstOrDefault(x => x.Baudrate == baudrate);
+            if (shared != null)
+            {
+                shared.AddEcu(cp);
+                return shared;
+            }
             J2534Channel newChannel = new J2534Channel(PhysicalDevice, cp);
             newChannel.TraceWriter = traceWriter;
             Channels.Add(newChannel);
             return newChannel;
+        }
+
+        public override void ReleaseChannel(BaseChannel channel, ParameterSet cp = null)
+        {
+            // keep a shared channel open while other ECUs still use it
+            if (channel is J2534Channel j2534 && cp != null && j2534.RemoveEcu(cp))
+            {
+                return;
+            }
+            base.ReleaseChannel(channel, cp);
         }
 
         public override void Dispose()

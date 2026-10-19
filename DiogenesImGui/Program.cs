@@ -38,7 +38,9 @@ namespace Diogenes
 
             OnlineTranslator.Start();
 
-            string commandLinePath = args.Length > 0 ? args[0] : null;
+            // "--simulate" fills the Vitals tab with made-up readings, to try the dashboard without a car
+            VitalsTab.Simulate = Array.IndexOf(args, "--simulate") >= 0;
+            string commandLinePath = Array.Find(args, a => a != "--simulate");
 
             // open at three quarters of the screen, centered, with the UI scaled to match the screen
             var (screenWidth, screenHeight) = DetectUiScale();
@@ -67,7 +69,12 @@ namespace Diogenes
                 string fontPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "segoeui.ttf");
                 if (File.Exists(fontPath))
                 {
-                    controller = new ImGuiController(gl, window, input, new ImGuiFontConfig(fontPath, (int)Math.Round(18 * Widgets.UiScale)), ConfigureIO);
+                    int baseSize = (int)Math.Round(18 * Widgets.UiScale);
+                    controller = new ImGuiController(gl, window, input, new ImGuiFontConfig(fontPath, baseSize), () =>
+                    {
+                        ConfigureIO();
+                        Fonts.Load(baseSize);
+                    });
                 }
                 else
                 {
@@ -82,7 +89,7 @@ namespace Diogenes
             window.Render += delta =>
             {
                 controller.Update((float)delta);
-                gl.ClearColor(Color.FromArgb(255, 24, 26, 30));
+                gl.ClearColor(Color.FromArgb(255, 9, 11, 16));
                 gl.Clear(ClearBufferMask.ColorBufferBit);
                 app.Draw();
                 controller.Render();

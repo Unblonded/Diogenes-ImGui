@@ -21,6 +21,9 @@ namespace Diogenes
         public CaesarConnection.Protocol.BaseProtocol Channel = null;
         public ECUVariant PrimaryVariant = null;
 
+        // more CBFs loaded next to the main one so the Vitals tab can read other ECUs too
+        public List<EcuSlot> ExtraEcus = new List<EcuSlot>();
+
         private int UserInitiatedRequestActive = 0;
 
         public class RawComParam : INotifyPropertyChanged

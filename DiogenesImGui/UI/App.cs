@@ -21,6 +21,7 @@ namespace Diogenes.UI
         public readonly LogBuffer Log;
         public readonly LogBuffer Trace = new LogBuffer();
 
+        readonly VitalsTab Vitals;
         readonly CommandsTab Commands;
         readonly CodingTab Coding;
         readonly FaultCodesTab FaultCodes;
@@ -35,6 +36,8 @@ namespace Diogenes.UI
 
         // one background operation at a time (connecting, running a command, reading memory, flashing)
         volatile bool busy = false;
+        volatile bool busyQuiet = false;   // routine background reads (live vitals) that shouldn't show in the status bar
+        bool PendingDisconnect = false;
         string BusyLabel = "";
         readonly ConcurrentQueue<Action> MainThreadQueue = new ConcurrentQueue<Action>();
 
@@ -63,6 +66,7 @@ namespace Diogenes.UI
         public App(LogBuffer log, string commandLinePath)
         {
             Log = log;
+            Vitals = new VitalsTab(this);
             Commands = new CommandsTab(this);
             Coding = new CodingTab(this);
             FaultCodes = new FaultCodesTab(this);
@@ -91,7 +95,7 @@ namespace Diogenes.UI
 
         // ---------------------------------------------------------------- background work
 
-        public bool RunBackground(string label, Action work, Action onFinishedMainThread = null)
+        public bool RunBackground(string label, Action work, Action onFinishedMainThread = null, bool quiet = false)
         {
             if (busy)
             {
@@ -99,6 +103,7 @@ namespace Diogenes.UI
                 return false;
             }
             busy = true;
+            busyQuiet = quiet;
             BusyLabel = label;
             Task.Run(() =>
             {
@@ -366,6 +371,7 @@ namespace Diogenes.UI
 
         void NotifyCbfOrVariantChange()
         {
+            Vitals.NotifyCbfOrVariantChange();
             Commands.NotifyCbfOrVariantChange();
             Coding.NotifyCbfOrVariantChange();
             FaultCodes.NotifyCbfOrVariantChange();
@@ -388,6 +394,12 @@ namespace Diogenes.UI
             while (MainThreadQueue.TryDequeue(out var action))
             {
                 action();
+            }
+            // disconnect pressed while live vitals were being read, close once that read is done
+            if (PendingDisconnect && !busy)
+            {
+                PendingDisconnect = false;
+                CloseConnection();
             }
 
             ImGui.GetIO().FontGlobalScale = Settings.FontSize / 18f;
@@ -646,9 +658,16 @@ namespace Diogenes.UI
             ImGui.SameLine();
             if (Connected)
             {
-                if (Widgets.ColoredButton("Disconnect", Theme.Bad, new Vector2(-1, 0), !busy))
+                if (Widgets.ColoredButton("Disconnect", Theme.Bad, new Vector2(-1, 0), (!busy || busyQuiet) && !PendingDisconnect))
                 {
-                    CloseConnection();
+                    if (busy)
+                    {
+                        PendingDisconnect = true;
+                    }
+                    else
+                    {
+                        CloseConnection();
+                    }
                 }
             }
             else
@@ -659,7 +678,7 @@ namespace Diogenes.UI
                 }
             }
 
-            if (busy)
+            if (busy && !busyQuiet)
             {
                 Widgets.StatusDot(Theme.Warn);
                 ImGui.TextUnformatted($"{BusyLabel}...");
@@ -668,7 +687,7 @@ namespace Diogenes.UI
             {
                 Widgets.StatusDot(Theme.Good);
                 string variant = Ctx.PrimaryVariant is null ? "version unknown" : VariantName(Ctx.PrimaryVariant);
-                ImGui.TextUnformatted($"Connected  |  {variant}");
+                ImGui.TextUnformatted($"Connected  |  {variant}" + (Vitals.IsLive ? "  |  live" : ""));
                 Widgets.Tooltip("The 'version' (variant) is the exact software version of the ECU. Commands for the right version are shown when it is known.");
             }
             else
@@ -700,9 +719,11 @@ namespace Diogenes.UI
             ImGui.BulletText("Step 1 - open the CBF file for the ECU you want (top left).");
             ImGui.BulletText("Step 2 - pick your adapter (top middle).");
             ImGui.BulletText("Step 3 - switch the ignition on and press Connect (top right).");
-            ImGui.BulletText("Then use the Commands tab: search for what you want, pick it, and press Run.");
+            ImGui.BulletText("The Vitals tab then shows the key readings live (coolant, transmission fluid, battery...), the VIN, mileage and stored faults.");
+            ImGui.BulletText("For anything else use the Commands tab: search for what you want, pick it, and press Run.");
             ImGui.Spacing();
             Widgets.Heading("Good to know");
+            ImGui.BulletText("Each CBF file is one control unit: open the engine ECU's file for coolant and oil, the transmission's for fluid temperature.");
             ImGui.BulletText("You can browse a CBF file without a car connected: commands, coding options and fault codes are all visible.");
             ImGui.BulletText("Green commands only read data. Yellow/red ones change something in the car and will ask before running.");
             ImGui.BulletText("View > Show original German names shows the untranslated names next to the English ones.");
@@ -742,14 +763,15 @@ namespace Diogenes.UI
             {
                 return;
             }
-            TabItem(0, "Commands", Commands.Draw);
-            TabItem(1, "Coding", Coding.Draw);
-            TabItem(2, "Fault codes", FaultCodes.Draw);
-            TabItem(3, "Memory", Memory.Draw);
-            TabItem(4, "Flash", Flash.Draw);
+            TabItem(0, "Vitals", Vitals.Draw);
+            TabItem(1, "Commands", Commands.Draw);
+            TabItem(2, "Coding", Coding.Draw);
+            TabItem(3, "Fault codes", FaultCodes.Draw);
+            TabItem(4, "Memory", Memory.Draw);
+            TabItem(5, "Flash", Flash.Draw);
             if (Settings.AdvancedMode)
             {
-                TabItem(5, "Settings", DrawSettingsTab);
+                TabItem(6, "Settings", DrawSettingsTab);
             }
             ImGui.EndTabBar();
         }

@@ -23,6 +23,14 @@ namespace Diogenes
         public bool AutoIdentifyVariant { get; set; } = true;
         public float FontSize { get; set; } = 18f;
 
+        // Vitals tab
+        public bool UsUnits { get; set; } = false;
+        public float VitalsInterval { get; set; } = 1f;
+        // "ECU|vital id" -> chosen value key, "" hides the vital
+        public Dictionary<string, string> VitalSources { get; set; } = new Dictionary<string, string>();
+        // ECU qualifier -> extra values the user added to the dashboard
+        public Dictionary<string, List<string>> VitalPins { get; set; } = new Dictionary<string, List<string>>();
+
         public static AppSettings Current { get; private set; } = Load();
 
         static AppSettings Load()

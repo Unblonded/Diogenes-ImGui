@@ -6,12 +6,27 @@ It shows everything from the CBF file in plain English.
 
 ## Download
 
-- **Windows:** get `DiogenesImGui-win-x86.zip` from the [Releases](../../releases) page, unzip it, and run `DiogenesImGui.exe`. Keep `glfw3.dll` and `cimgui.dll` next to the exe.
-- **Mac:** get `DiogenesImGui-osx-arm64.zip` (M1/M2/M3/M4) or `DiogenesImGui-osx-x64.zip` (Intel), unzip it and move `Diogenes.app` to Applications. The app isn't notarized, so the first time right-click it and choose **Open**. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/Diogenes.app`.
+Get the latest build from the [Releases](../../releases/latest) page. No .NET install is needed.
 
-No .NET install is needed.
+### Mac
 
-To publish a new release, push a version tag: `git tag v1.0.1 && git push origin v1.0.1`.
+1. Download `DiogenesImGui-osx-arm64.zip` for an M-chip Mac (M1/M2/M3/M4), or `DiogenesImGui-osx-x64.zip` for an Intel Mac.
+2. Unzip it and move `Diogenes.app` to Applications.
+3. The app isn't notarized, so the first time right-click it and choose **Open**, then **Open** again. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/Diogenes.app` in Terminal.
+4. Install the driver for your adapter (see [Adapters on a Mac](#adapters-on-a-mac)). For a Tactrix OpenPort 2.0:
+   ```
+   brew install bisak/tap/openport-j2534
+   ```
+5. Take any microSD card out of the OpenPort, plug it into the Mac and the car, and switch the ignition on.
+6. In Diogenes: open the ECU's CBF file, pick **Tactrix OpenPort 2.0** under Adapter, and press **Connect**.
+
+### Windows
+
+Download `DiogenesImGui-win-x86.zip`, unzip it, and run `DiogenesImGui.exe`. Keep `glfw3.dll` and `cimgui.dll` next to the exe.
+
+### New releases
+
+Every push to this branch is built by GitHub Actions and published as a release (`v1.3.<build number>`). To publish a specific version instead, push a tag: `git tag v2.0.0 && git push origin v2.0.0`.
 
 ## What's different from Diogenes II
 

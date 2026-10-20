@@ -1,7 +1,8 @@
 name: Build
 
-# Every push builds the app for Windows and for Macs (Apple silicon and Intel) and keeps the zips as workflow artifacts.
-# Pushing a tag like v1.0.0 also publishes them as a GitHub Release.
+# Every push builds the app for Macs (Apple silicon and Intel) and Windows, and publishes the zips as a
+# GitHub Release: v1.3.<run number> for a branch push, or the tag's own name when a tag like v2.0.0 is pushed.
+# Pull requests only build.
 on:
   push:
     branches: [windows, macos]
@@ -11,6 +12,9 @@ on:
 
 permissions:
   contents: write
+
+env:
+  RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.3.{0}', github.run_number) }}
 
 jobs:
   build:
@@ -56,10 +60,8 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Build app bundle
-        env:
-          VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '0.0.0' }}
         run: |
-          VERSION="${VERSION#v}" mac/build-app.sh ${{ matrix.rid }}
+          VERSION="${RELEASE_TAG#v}" mac/build-app.sh ${{ matrix.rid }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -67,7 +69,7 @@ jobs:
           path: DiogenesImGui-${{ matrix.rid }}.zip
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name != 'pull_request'
     needs: [build, build-mac]
     runs-on: ubuntu-latest
     steps:
@@ -78,10 +80,16 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >
-          gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}"
-          DiogenesImGui-win-x86.zip DiogenesImGui-osx-arm64.zip DiogenesImGui-osx-x64.zip
-          --title "Diogenes ImGui ${{ github.ref_name }}"
-          --notes "Windows: download DiogenesImGui-win-x86.zip, unzip it, and run DiogenesImGui.exe. Keep glfw3.dll and cimgui.dll next to the exe.
-          Mac: DiogenesImGui-osx-arm64.zip for M chips, DiogenesImGui-osx-x64.zip for Intel. Unzip, move Diogenes.app to Applications, and the first time right-click it and choose Open (it is not notarized).
-          No .NET install needed. CBF files are not included."
+        run: |
+          cat > notes.md <<'EOF'
+          Built from `${{ github.ref_name }}` (${{ github.sha }}).
+
+          **Mac:** `DiogenesImGui-osx-arm64.zip` for M chips (M1/M2/M3/M4), `DiogenesImGui-osx-x64.zip` for Intel. Unzip, move Diogenes.app to Applications, and the first time right-click it and choose Open (it is not notarized). For an OpenPort 2.0 cable install its driver first: `brew install bisak/tap/openport-j2534`.
+
+          **Windows:** download `DiogenesImGui-win-x86.zip`, unzip it, and run DiogenesImGui.exe. Keep glfw3.dll and cimgui.dll next to the exe.
+
+          No .NET install needed. CBF files are not included.
+          EOF
+          gh release create "$RELEASE_TAG" --repo "${{ github.repository }}" --target "${{ github.sha }}" \
+            --title "Diogenes ImGui $RELEASE_TAG" --notes-file notes.md \
+            DiogenesImGui-osx-arm64.zip DiogenesImGui-osx-x64.zip DiogenesImGui-win-x86.zip

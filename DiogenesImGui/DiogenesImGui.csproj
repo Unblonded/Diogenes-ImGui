@@ -23,6 +23,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- translations shipped with the program, see OnlineTranslator -->
+    <EmbeddedResource Include="Translation\translations-de-en.json" LogicalName="translations-de-en.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\CaesarConnection\CaesarConnection.csproj" />
     <ProjectReference Include="..\Caesar\Caesar.csproj" />
     <ProjectReference Include="..\Interpreter\Interpreter.csproj" />

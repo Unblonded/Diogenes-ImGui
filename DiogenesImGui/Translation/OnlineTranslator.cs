@@ -12,6 +12,8 @@ namespace Diogenes.Translation
 {
     // Sends German strings to Google Translate in the background and keeps the results in a cache file,
     // so each string is only ever translated once. Callers never wait: they get null until a result is ready.
+    // Translations shipped with the program (Translation/translations-de-en.json) are loaded first, so a
+    // new install shows them straight away, even offline.
     public static class OnlineTranslator
     {
         const int MaxBatchChars = 1200;
@@ -21,7 +23,10 @@ namespace Diogenes.Translation
 
         static string CachePath => Path.Combine(AppSettings.SettingsFolder, "translations-de-en.json");
 
+        const string BuiltInResource = "translations-de-en.json";
+
         static readonly ConcurrentDictionary<string, string> Cache = new ConcurrentDictionary<string, string>();
+        static readonly Dictionary<string, string> BuiltIn = new Dictionary<string, string>();
         static readonly ConcurrentDictionary<string, byte> Queued = new ConcurrentDictionary<string, byte>();
         static readonly BlockingCollection<string> Pending = new BlockingCollection<string>();
         static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
@@ -187,6 +192,24 @@ namespace Diogenes.Translation
         {
             try
             {
+                using var stream = typeof(OnlineTranslator).Assembly.GetManifestResourceStream(BuiltInResource);
+                if (stream != null)
+                {
+                    foreach (var kv in JsonSerializer.Deserialize<Dictionary<string, string>>(stream))
+                    {
+                        BuiltIn[kv.Key] = kv.Value;
+                        Cache[kv.Key] = kv.Value;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Built-in translations could not be read: {ex.Message}");
+            }
+
+            // this computer's own translations come second, so they win over the built-in ones
+            try
+            {
                 if (File.Exists(CachePath))
                 {
                     var stored = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(CachePath));
@@ -210,7 +233,9 @@ namespace Diogenes.Translation
                 try
                 {
                     Directory.CreateDirectory(AppSettings.SettingsFolder);
-                    var snapshot = new SortedDictionary<string, string>(Cache);
+                    // only what this computer learned, the built-in translations ship with the program
+                    var snapshot = new SortedDictionary<string, string>(Cache.Where(kv => !BuiltIn.TryGetValue(kv.Key, out string builtIn) || builtIn != kv.Value)
+                                                                              .ToDictionary(kv => kv.Key, kv => kv.Value));
                     var options = new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
                     File.WriteAllText(CachePath, JsonSerializer.Serialize(snapshot, options));
                     UnsavedCount = 0;

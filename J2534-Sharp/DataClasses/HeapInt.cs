@@ -20,6 +20,7 @@
 *SOFTWARE.
 */
 #endregion License
+
 using System;
 using System.Runtime.InteropServices;
 
@@ -30,16 +31,19 @@ namespace SAE.J2534
         public IntPtr Ptr { get; }
         public HeapInt() 
         {
-            Ptr = Marshal.AllocHGlobal(4);
+            //8 zeroed bytes fit an 'unsigned long' of either size: a driver writing 4 bytes leaves the top half zero,
+            //and a driver reading 4 bytes sees the low half (little endian)
+            Ptr = Marshal.AllocHGlobal(8);
+            Marshal.WriteInt64(Ptr, 0);
         }
         public HeapInt(int i) : this()
         {
-            Marshal.WriteInt32(Ptr, i);
+            Value = i;
         }
         public int Value
         {
-            get { return Marshal.ReadInt32(Ptr); }
-            set { Marshal.WriteInt32(Ptr, value); }
+            get { return (int)Marshal.ReadInt64(Ptr); }
+            set { Marshal.WriteInt64(Ptr, (uint)value); }
         }
         public static explicit operator IntPtr(HeapInt HeapIntPtr)
         {

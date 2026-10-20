@@ -5,16 +5,21 @@ using System.Text.Json;
 
 namespace Diogenes
 {
-    // Replaces Properties.Settings from the WinForms version. Stored as JSON in %APPDATA%\DiogenesImGui.
+    // Replaces Properties.Settings from the WinForms version. Stored as JSON in %APPDATA%\DiogenesImGui,
+    // or ~/Library/Application Support/DiogenesImGui on a Mac.
     public class AppSettings
     {
         const int RecentFileMaxCount = 12;
 
-        public static string SettingsFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DiogenesImGui");
+        public static string SettingsFolder => OperatingSystem.IsMacOS()
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Application Support", "DiogenesImGui")
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DiogenesImGui");
         static string SettingsPath => Path.Combine(SettingsFolder, "settings.json");
 
         public List<string> RecentCbfFiles { get; set; } = new List<string>();
         public int LastSelectedDevice { get; set; } = 0;
+        // J2534 driver libraries added by hand (macOS and Linux have no registry that lists them)
+        public List<string> J2534DriverFiles { get; set; } = new List<string>();
 
         public bool TranslateToEnglish { get; set; } = true;
         public bool UseOnlineTranslation { get; set; } = true;

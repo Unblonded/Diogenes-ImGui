@@ -20,31 +20,45 @@
 *SOFTWARE.
 */
 #endregion License
+
 using System;
 using System.Runtime.InteropServices;
 
 namespace SAE.J2534
 {
+    /// <summary>
+    /// A {unsigned long NumOfItems; T* pItems} list followed by its items. Items are structs made only of
+    /// 'unsigned long' fields, so they are written field by field to suit the driver's long size.
+    /// </summary>
     internal abstract class HeapStructArray<T> : Common.UnmanagedDisposable
     {
+        private readonly int longSize;
         private readonly int elementSize;
         private readonly IntPtr firstElementPtr;
         public IntPtr Ptr { get; }
-        private HeapStructArray(int Length)
+
+        protected abstract int FieldCount { get; }
+        protected abstract int[] ToFields(T Element);
+        protected abstract T FromFields(int[] Fields);
+
+        private HeapStructArray(int Length, int LongSize)
         {
-            elementSize = Marshal.SizeOf(typeof(T));
-            //Create a blob big enough for all elements and two longs (NumOfItems and pItems)
-            Ptr = Marshal.AllocHGlobal(Length * elementSize + 8);
-            firstElementPtr = IntPtr.Add(Ptr, 8);
+            longSize = LongSize;
+            elementSize = FieldCount * LongSize;
+            //Create a blob big enough for all elements, NumOfItems and pItems
+            int header = NativeLong.ListPointerOffset(LongSize) + IntPtr.Size;
+            Ptr = Marshal.AllocHGlobal(Length * elementSize + header);
+            firstElementPtr = IntPtr.Add(Ptr, header);
+            Marshal.WriteInt64(Ptr, 0);
             this.Length = Length;
             //Write pItems.  To save complexity, the array immediately follows SConfigArray.
-            Marshal.WriteIntPtr(Ptr, 4, firstElementPtr);
+            Marshal.WriteIntPtr(Ptr, NativeLong.ListPointerOffset(LongSize), firstElementPtr);
         }
-        public HeapStructArray(T Element) : this(1)
+        protected HeapStructArray(T Element, int LongSize) : this(1, LongSize)
         {
             setIndex(0, Element);
         }
-        public HeapStructArray(T[] Elements) : this(Elements.Length)
+        protected HeapStructArray(T[] Elements, int LongSize) : this(Elements.Length, LongSize)
         {
             //Write the array to the blob
             for (int i = 0; i < Elements.Length; i++)
@@ -52,8 +66,8 @@ namespace SAE.J2534
         }
         public int Length
         {
-            get { return Marshal.ReadInt32(Ptr); }
-            private set { Marshal.WriteInt32(Ptr, value); }
+            get { return NativeLong.Read(Ptr, 0, longSize); }
+            private set { NativeLong.Write(Ptr, 0, longSize, value); }
         }
         public T this[int Index]
         {
@@ -70,11 +84,18 @@ namespace SAE.J2534
         }
         private T getIndex(int Index)
         {
-            return Marshal.PtrToStructure<T>(IntPtr.Add(firstElementPtr, Index * elementSize));
+            IntPtr pElement = IntPtr.Add(firstElementPtr, Index * elementSize);
+            int[] fields = new int[FieldCount];
+            for (int i = 0; i < fields.Length; i++)
+                fields[i] = NativeLong.Read(pElement, i * longSize, longSize);
+            return FromFields(fields);
         }
         private void setIndex(int Index, T Element)
         {
-            Marshal.StructureToPtr<T>(Element, IntPtr.Add(firstElementPtr, Index * elementSize), false);
+            IntPtr pElement = IntPtr.Add(firstElementPtr, Index * elementSize);
+            int[] fields = ToFields(Element);
+            for (int i = 0; i < fields.Length; i++)
+                NativeLong.Write(pElement, i * longSize, longSize, fields[i]);
         }
         public T[] ToArray()
         {

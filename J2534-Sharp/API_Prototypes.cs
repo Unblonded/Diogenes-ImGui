@@ -51,30 +51,32 @@ namespace SAE.J2534
 {
     public partial class API
     {
+        //J2534 integers are C 'unsigned long'. Passing them as nint keeps them register sized: 32-bit on
+        //Windows x86, and on 64-bit macOS/Linux it suits drivers built with either 64-bit longs or u32.
         //Shared prototypes
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruConnect(int DeviceID, int ProtocolID, int ConnectFlags, int Baud, IntPtr ChannelID);
+        internal delegate ResultCode PassThruConnect(nint DeviceID, nint ProtocolID, nint ConnectFlags, nint Baud, IntPtr ChannelID);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruDisconnect(int channelId);
+        internal delegate ResultCode PassThruDisconnect(nint channelId);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruReadMsgs(int ChannelID, IntPtr pUMsgArray, IntPtr NumMsgs, int Timeout);
+        internal delegate ResultCode PassThruReadMsgs(nint ChannelID, IntPtr pUMsgArray, IntPtr NumMsgs, nint Timeout);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruWriteMsgs(int ChannelID, IntPtr pUMsgArray, IntPtr NumMsgs, int Timeout);
+        internal delegate ResultCode PassThruWriteMsgs(nint ChannelID, IntPtr pUMsgArray, IntPtr NumMsgs, nint Timeout);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruStartPeriodicMsg(int ChannelID, IntPtr Msg, IntPtr MsgID, int Interval);
+        internal delegate ResultCode PassThruStartPeriodicMsg(nint ChannelID, IntPtr Msg, IntPtr MsgID, nint Interval);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruStopPeriodicMsg(int ChannelID, int MsgID);
+        internal delegate ResultCode PassThruStopPeriodicMsg(nint ChannelID, nint MsgID);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         internal delegate ResultCode PassThruStartMsgFilter
         (
-            int ChannelID,
-            int FilterType,
+            nint ChannelID,
+            nint FilterType,
             IntPtr pMaskMsg,
             IntPtr PatternMsg,
             IntPtr pFlowControlMsg,
@@ -82,26 +84,26 @@ namespace SAE.J2534
         );
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruStopMsgFilter(int ChannelID, int FilterID);
+        internal delegate ResultCode PassThruStopMsgFilter(nint ChannelID, nint FilterID);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruSetProgrammingVoltage(int DeviceID, int Pin, int Voltage);
+        internal delegate ResultCode PassThruSetProgrammingVoltage(nint DeviceID, nint Pin, nint Voltage);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruReadVersion(int DeviceID, IntPtr pFirmwareVer, IntPtr pDllVer, IntPtr pAPIVer);
+        internal delegate ResultCode PassThruReadVersion(nint DeviceID, IntPtr pFirmwareVer, IntPtr pDllVer, IntPtr pAPIVer);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         internal delegate ResultCode PassThruGetLastError(IntPtr pErr);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruIoctl(int HandleID, int IOCtlID, IntPtr Input, IntPtr Output);
+        internal delegate ResultCode PassThruIoctl(nint HandleID, nint IOCtlID, IntPtr Input, IntPtr Output);
 
         //v2.02 ONLY
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruConnectv202(int ProtocolID, int ConnectFlags, IntPtr ChannelID);
+        internal delegate ResultCode PassThruConnectv202(nint ProtocolID, nint ConnectFlags, IntPtr ChannelID);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruSetProgrammingVoltagev202(int Pin, int Voltage);
+        internal delegate ResultCode PassThruSetProgrammingVoltagev202(nint Pin, nint Voltage);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         internal delegate ResultCode PassThruReadVersionv202(IntPtr pFirmwareVer, IntPtr pDllVer, IntPtr pAPIVer);
@@ -110,25 +112,25 @@ namespace SAE.J2534
         internal delegate ResultCode PassThruOpen(IntPtr pDeviceName, IntPtr DeviceID);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruClose(int DeviceID);
+        internal delegate ResultCode PassThruClose(nint DeviceID);
         //v5.00 and undocumented drewtech calls
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruScanForDevices(ref int DeviceCount);
+        internal delegate ResultCode PassThruScanForDevices(ref nint DeviceCount);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         internal delegate ResultCode PassThruGetNextDevice(IntPtr pSDevice);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruLogicalConnect(int PhysicalChannelID, int ProtocolID, int ConnectFlags, IntPtr ChannelDescriptor, ref int pChannelID);
+        internal delegate ResultCode PassThruLogicalConnect(nint PhysicalChannelID, nint ProtocolID, nint ConnectFlags, IntPtr ChannelDescriptor, ref nint pChannelID);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruLogicalDisconnect(int pChannelID);
+        internal delegate ResultCode PassThruLogicalDisconnect(nint pChannelID);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruSelect(IntPtr pSChannelSet, int SelectType, int Timeout);
+        internal delegate ResultCode PassThruSelect(IntPtr pSChannelSet, nint SelectType, nint Timeout);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate ResultCode PassThruQueueMsgs(int ChannelID, IntPtr pMsgArray, ref int NumMsgs);
+        internal delegate ResultCode PassThruQueueMsgs(nint ChannelID, IntPtr pMsgArray, ref nint NumMsgs);
         //Drewtech ONLY
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         internal delegate ResultCode PassThruGetNextCarDAQ(IntPtr pName, IntPtr pVer, IntPtr pAddress);

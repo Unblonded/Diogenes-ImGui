@@ -226,3 +226,7 @@ DiogenesImGui-publish/
 *.CBF
 *.cff
 *.CFF
+
+# macOS app bundle build output
+publish-mac/
+DiogenesImGui-*.zip

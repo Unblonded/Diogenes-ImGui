@@ -27,11 +27,23 @@ namespace SAE.J2534
         public string Name { get; }
         public string Filename { get; }
         public string Details { get; }
-        public APIInfo(string Name, string Filename, string Details)
+        /// <summary>
+        /// Size of the driver's 'unsigned long' in bytes
+        /// </summary>
+        public int LongSize { get; }
+        public APIInfo(string Name, string Filename, string Details) : this(Name, Filename, Details, DefaultLongSize)
+        {
+        }
+        public APIInfo(string Name, string Filename, string Details, int LongSize)
         {
             this.Name = Name;
             this.Filename = Filename;
             this.Details = Details;
+            this.LongSize = LongSize;
         }
+        /// <summary>
+        /// What a C compiler uses for 'unsigned long': 4 bytes on Windows, the pointer size elsewhere
+        /// </summary>
+        public static int DefaultLongSize => System.OperatingSystem.IsWindows() ? 4 : System.IntPtr.Size;
     }
 }

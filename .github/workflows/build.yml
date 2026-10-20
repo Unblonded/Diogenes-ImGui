@@ -1,10 +1,10 @@
 name: Build
 
-# Every push builds the app and keeps the zip as a workflow artifact.
-# Pushing a tag like v1.0.0 also publishes it as a GitHub Release.
+# Every push builds the app for Windows and for Macs (Apple silicon and Intel) and keeps the zips as workflow artifacts.
+# Pushing a tag like v1.0.0 also publishes them as a GitHub Release.
 on:
   push:
-    branches: [main]
+    branches: [windows, macos]
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -40,14 +40,48 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: DiogenesImGui-win-x86
-          path: publish/
+          path: DiogenesImGui-win-x86.zip
+
+  build-mac:
+    # macos-14 runners are Apple silicon
+    runs-on: macos-14
+    strategy:
+      matrix:
+        rid: [osx-arm64, osx-x64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build app bundle
+        env:
+          VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '0.0.0' }}
+        run: |
+          VERSION="${VERSION#v}" mac/build-app.sh ${{ matrix.rid }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DiogenesImGui-${{ matrix.rid }}
+          path: DiogenesImGui-${{ matrix.rid }}.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, build-mac]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
 
       - name: Create release
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
-          gh release create "${{ github.ref_name }}" DiogenesImGui-win-x86.zip
+          gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}"
+          DiogenesImGui-win-x86.zip DiogenesImGui-osx-arm64.zip DiogenesImGui-osx-x64.zip
           --title "Diogenes ImGui ${{ github.ref_name }}"
-          --notes "Download DiogenesImGui-win-x86.zip, unzip it, and run DiogenesImGui.exe. Keep glfw3.dll and cimgui.dll next to the exe. No .NET install needed. CBF files are not included."
+          --notes "Windows: download DiogenesImGui-win-x86.zip, unzip it, and run DiogenesImGui.exe. Keep glfw3.dll and cimgui.dll next to the exe.
+          Mac: DiogenesImGui-osx-arm64.zip for M chips, DiogenesImGui-osx-x64.zip for Intel. Unzip, move Diogenes.app to Applications, and the first time right-click it and choose Open (it is not notarized).
+          No .NET install needed. CBF files are not included."

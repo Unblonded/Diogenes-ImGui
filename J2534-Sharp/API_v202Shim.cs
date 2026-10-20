@@ -44,25 +44,25 @@ namespace SAE.J2534
             return ResultCode.INVALID_DEVICE_ID;
         }
 
-        private ResultCode Close_shim(int DeviceID)
+        private ResultCode Close_shim(nint DeviceID)
         {
             if (!shim_IsOpen || DeviceID != shim_DeviceID) return ResultCode.INVALID_DEVICE_ID;
             return ResultCode.STATUS_NOERROR;
         }
 
-        private ResultCode Connect_shim(int DeviceID, int ProtocolID, int ConnectFlags, int Baud, IntPtr ChannelID)
+        private ResultCode Connect_shim(nint DeviceID, nint ProtocolID, nint ConnectFlags, nint Baud, IntPtr ChannelID)
         {
             if (DeviceID != shim_DeviceID) return ResultCode.INVALID_DEVICE_ID;
             return PTConnectv202(ProtocolID, ConnectFlags, ChannelID);
         }
 
-        private ResultCode SetVoltage_shim(int DeviceID, int Pin, int Voltage)
+        private ResultCode SetVoltage_shim(nint DeviceID, nint Pin, nint Voltage)
         {
             if (DeviceID != shim_DeviceID) return ResultCode.INVALID_DEVICE_ID;
             return PTSetProgrammingVoltagev202(Pin, Voltage);
         }
 
-        private ResultCode ReadVersion_shim(int DeviceID, IntPtr pFirmwareVer, IntPtr pDllVer, IntPtr pAPIVer)
+        private ResultCode ReadVersion_shim(nint DeviceID, IntPtr pFirmwareVer, IntPtr pDllVer, IntPtr pAPIVer)
         {
             if (DeviceID != shim_DeviceID) return ResultCode.INVALID_DEVICE_ID;
             return PTReadVersionv202(pFirmwareVer, pDllVer, pAPIVer);

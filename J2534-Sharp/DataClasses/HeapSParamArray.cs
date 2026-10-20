@@ -20,6 +20,7 @@
 *SOFTWARE.
 */
 #endregion License
+
 using System;
 using System.Runtime.InteropServices;
 
@@ -27,11 +28,14 @@ namespace SAE.J2534
 {
     internal class HeapSParamArray : HeapStructArray<SParam>
     {
-        HeapSParamArray(SParam SParam) : base(SParam)
+        HeapSParamArray(SParam SParam, int LongSize) : base(SParam, LongSize)
         {
         }
-        HeapSParamArray(SParam[] SParamList) : base(SParamList)
+        HeapSParamArray(SParam[] SParamList, int LongSize) : base(SParamList, LongSize)
         {
         }
+        protected override int FieldCount => 3;
+        protected override int[] ToFields(SParam Element) => new[] { (int)Element.Parameter, Element.Value, Element.Supported };
+        protected override SParam FromFields(int[] Fields) => new SParam((DeviceInfo)Fields[0], Fields[1], Fields[2]);
     }
 }

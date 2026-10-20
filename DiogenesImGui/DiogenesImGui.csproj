@@ -2,10 +2,13 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <!-- J2534 adapter drivers are almost always 32-bit, so this has to stay x86 -->
-    <PlatformTarget>x86</PlatformTarget>
-    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- J2534 adapter drivers are almost always 32-bit on Windows, so the Windows build stays x86.
+         On a Mac it builds for the Mac's own CPU, since the J2534 drivers there are native (arm64 on M chips). -->
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">win-x86</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('OSX')) And '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'Arm64'">osx-arm64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('OSX'))">osx-x64</RuntimeIdentifier>
+    <PlatformTarget Condition="'$(RuntimeIdentifier)' == 'win-x86'">x86</PlatformTarget>
     <SelfContained>false</SelfContained>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <Nullable>disable</Nullable>
@@ -20,6 +23,11 @@
     <PackageReference Include="Silk.NET.Windowing" Version="2.22.0" />
     <PackageReference Include="Silk.NET.Input" Version="2.22.0" />
     <PackageReference Include="Silk.NET.OpenGL.Extensions.ImGui" Version="2.22.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="!$(RuntimeIdentifier.StartsWith('win'))">
+    <!-- icon font for macOS and Linux, where Segoe MDL2 Assets isn't installed (Apache 2.0, see the license file) -->
+    <None Include="Fonts\MaterialIcons-Regular.ttf;Fonts\MaterialIcons-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
   <ItemGroup>

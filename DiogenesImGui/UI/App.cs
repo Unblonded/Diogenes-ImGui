@@ -257,6 +257,7 @@ namespace Diogenes.UI
         {
             try
             {
+                CaesarConnection.VCI.J2534Device.ExtraDriverPaths = Settings.J2534DriverFiles.ToList();
                 Devices = CaesarConnection.Connection.GetDevices();
             }
             catch (Exception ex)
@@ -269,6 +270,28 @@ namespace Diogenes.UI
             {
                 SelectedDevice = 0;
             }
+        }
+
+        // macOS and Linux have no registry of J2534 drivers, so a driver library can be picked by hand
+        void AddDriverFile()
+        {
+            string path = FileDialogs.OpenFile("Select a J2534 driver library (.dylib or .so)", "Driver libraries (*.dylib;*.so)|*.dylib;*.so|All files (*.*)|*.*");
+            if (path == null)
+            {
+                return;
+            }
+            if (!Settings.J2534DriverFiles.Contains(path))
+            {
+                Settings.J2534DriverFiles.Add(path);
+            }
+            RefreshDevices();
+            int added = Array.FindIndex(Devices, d => d.Parameter == path);
+            if (added >= 0)
+            {
+                SelectedDevice = added;
+                Settings.LastSelectedDevice = Devices[added].GetPersistentHash();
+            }
+            Settings.Save();
         }
 
         void RefreshInterfaces()
@@ -532,7 +555,7 @@ namespace Diogenes.UI
                 CloseConnection();
             }
 
-            ImGui.GetIO().FontGlobalScale = Settings.FontSize / 18f;
+            ImGui.GetIO().FontGlobalScale = Settings.FontSize / 18f / Fonts.RasterScale;
 
             var viewport = ImGui.GetMainViewport();
             ImGui.SetNextWindowPos(viewport.WorkPos);
@@ -625,7 +648,7 @@ namespace Diogenes.UI
                 ImGui.Separator();
                 if (ImGui.MenuItem("Open program folder"))
                 {
-                    System.Diagnostics.Process.Start("explorer.exe", AppContext.BaseDirectory);
+                    System.Diagnostics.Process.Start(OperatingSystem.IsWindows() ? "explorer.exe" : OperatingSystem.IsMacOS() ? "open" : "xdg-open", AppContext.BaseDirectory);
                 }
                 if (ImGui.MenuItem("Exit"))
                 {
@@ -743,15 +766,32 @@ namespace Diogenes.UI
             ImGui.TableNextColumn();
             Widgets.BeginCard("step2", new Vector2(0, cardHeight));
             StepTitle(2, "Adapter", SelectedDevice >= 0);
-            Widgets.Help("The interface cable between this PC and the car's OBD port. Any J2534 pass-thru device should work (e.g. OpenPort 2.0). Its driver must be installed.");
-            ImGui.BeginDisabled(Connected || busy);
-            if (Devices.Length == 0)
+            if (OperatingSystem.IsWindows())
             {
-                Widgets.Colored(Theme.Warn, "No J2534 adapter found. Install its driver, plug it in, then refresh.");
+                Widgets.Help("The interface cable between this PC and the car's OBD port. Any J2534 pass-thru device should work (e.g. OpenPort 2.0). Its driver must be installed.");
             }
             else
             {
-                ImGui.SetNextItemWidth(Widgets.S(-90));
+                Widgets.Help("The interface cable between this Mac and the car's OBD port. A Tactrix OpenPort 2.0 works with the open source driver: brew install bisak/tap/openport-j2534. " +
+                             "Drivers listed in ~/.passthru (e.g. Macchina) show up too, and any other J2534 driver library can be added with 'Add driver'.");
+            }
+            ImGui.BeginDisabled(Connected || busy);
+            if (Devices.Length == 0)
+            {
+                Widgets.Colored(Theme.Warn, OperatingSystem.IsWindows()
+                    ? "No J2534 adapter found. Install its driver, plug it in, then refresh."
+                    : "No J2534 driver found. For an OpenPort 2.0: brew install bisak/tap/openport-j2534, then refresh.");
+            }
+            else
+            {
+                // leave room for Refresh (and Add driver off Windows)
+                var style = ImGui.GetStyle();
+                float buttons = ImGui.CalcTextSize($"{Icons.Refresh}  Refresh").X + style.FramePadding.X * 2 + style.ItemSpacing.X;
+                if (!OperatingSystem.IsWindows())
+                {
+                    buttons += ImGui.CalcTextSize($"{Icons.Add}  Add driver...").X + style.FramePadding.X * 2 + style.ItemSpacing.X;
+                }
+                ImGui.SetNextItemWidth(OperatingSystem.IsWindows() ? Widgets.S(-90) : -buttons);
                 string preview = SelectedDevice >= 0 ? Devices[SelectedDevice].Name : "Choose...";
                 if (ImGui.BeginCombo("##device", preview))
                 {
@@ -771,6 +811,15 @@ namespace Diogenes.UI
             if (ImGui.Button($"{Icons.Refresh}  Refresh"))
             {
                 RefreshDevices();
+            }
+            if (!OperatingSystem.IsWindows())
+            {
+                ImGui.SameLine();
+                if (ImGui.Button($"{Icons.Add}  Add driver..."))
+                {
+                    AddDriverFile();
+                }
+                Widgets.Tooltip("Pick a J2534 driver library (.dylib) that isn't listed");
             }
             ImGui.EndDisabled();
             Widgets.EndCard();

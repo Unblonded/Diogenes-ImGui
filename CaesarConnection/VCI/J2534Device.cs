@@ -14,10 +14,15 @@ namespace CaesarConnection.VCI
     {
         API Api;
         Device PhysicalDevice;
+        // size of the driver's C 'unsigned long', 4 on Windows; 8 or 4 on macOS/Linux depending on the driver
+        public int LongSize = APIInfo.DefaultLongSize;
+
+        // driver libraries the user picked by hand (macOS/Linux have no registry to list them)
+        public static List<string> ExtraDriverPaths = new List<string>();
 
         public void Connect()
         {
-            APIFactory.GetAPI(Parameter);
+            APIFactory.GetAPI(Parameter, LongSize);
         }
 
         public static J2534Device[] GetJ2534Devices() 
@@ -29,14 +34,26 @@ namespace CaesarConnection.VCI
                 {
                     Name = apiInfo.Name,
                     Parameter = apiInfo.Filename,
+                    LongSize = apiInfo.LongSize,
                 });
+            }
+            foreach (string path in ExtraDriverPaths)
+            {
+                if (File.Exists(path) && !result.Any(x => x.Parameter == path))
+                {
+                    result.Add(new J2534Device
+                    {
+                        Name = Path.GetFileName(path),
+                        Parameter = path,
+                    });
+                }
             }
             return result.ToArray();
         }
 
         public override void OpenVCI()
         {
-            Api = APIFactory.GetAPI(Parameter); // parameter here refers to the dll path
+            Api = APIFactory.GetAPI(Parameter, LongSize); // parameter here refers to the dll path
             PhysicalDevice = Api.GetDevice();
             Console.WriteLine($"J2534 device {Path.GetFileName(Parameter)} opened");
         }

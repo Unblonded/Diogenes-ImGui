@@ -6,7 +6,10 @@ It shows everything from the CBF file in plain English.
 
 ## Download
 
-Get `DiogenesImGui-win-x86.zip` from the [Releases](../../releases) page, unzip it, and run `DiogenesImGui.exe`. No .NET install is needed. Keep `glfw3.dll` and `cimgui.dll` next to the exe.
+- **Windows:** get `DiogenesImGui-win-x86.zip` from the [Releases](../../releases) page, unzip it, and run `DiogenesImGui.exe`. Keep `glfw3.dll` and `cimgui.dll` next to the exe.
+- **Mac:** get `DiogenesImGui-osx-arm64.zip` (M1/M2/M3/M4) or `DiogenesImGui-osx-x64.zip` (Intel), unzip it and move `Diogenes.app` to Applications. The app isn't notarized, so the first time right-click it and choose **Open**. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/Diogenes.app`.
+
+No .NET install is needed.
 
 To publish a new release, push a version tag: `git tag v1.0.1 && git push origin v1.0.1`.
 
@@ -21,6 +24,22 @@ To publish a new release, push a version tag: `git tag v1.0.1 && git push origin
 - **New tabs**: read-only coding view that can read the current values from the car, and a searchable fault code list.
 - Advanced mode (View menu) brings back raw bytes, bit positions, connection parameters and a raw hex console.
 
+## Adapters on a Mac
+
+J2534 drivers are Windows DLLs, so a Mac needs a native driver built for its CPU (arm64 on M chips):
+
+- **Tactrix OpenPort 2.0** (recommended): the open source [openport-j2534](https://github.com/bisak/openport-j2534) driver supports Apple silicon and Intel Macs and needs no kernel extension.
+  ```
+  brew install bisak/tap/openport-j2534
+  ```
+  Plug the cable in, then press **Refresh** under Adapter. Diogenes finds it in `/opt/homebrew/lib` (or `/usr/local/lib`). Take any microSD card out of the cable first.
+- **Macchina M2 / A0**: [Macchina-J2534](https://github.com/rnd-ash/Macchina-J2534) installs into `~/.passthru/`, which Diogenes reads.
+- **Any other J2534 driver library**: press **Add driver...** under Adapter and pick its `.dylib`.
+
+Drivers listed in `~/.passthru/*.json` (`NAME`, `FUNCTION_LIB`) are assumed to use 32-bit integers, as the Macchina driver does. Add `"LONG_SIZE": 8` to the JSON for a driver built with the C `unsigned long` (64-bit on a Mac). Drivers found in the Homebrew folder or added by hand use the C size.
+
+Settings are kept in `~/Library/Application Support/DiogenesImGui`.
+
 ## Layout
 
 | Folder | What |
@@ -31,7 +50,7 @@ To publish a new release, push a version tag: `git tag v1.0.1 && git push origin
 
 ## Building
 
-Requires the .NET 8 SDK. The app is 32-bit because J2534 adapter drivers usually are.
+Requires the .NET 8 SDK. The Windows app is 32-bit because J2534 adapter drivers on Windows usually are.
 
 ```
 dotnet publish DiogenesImGui -c Release -r win-x86 --self-contained true -p:PublishSingleFile=true -o publish
@@ -39,11 +58,13 @@ dotnet publish DiogenesImGui -c Release -r win-x86 --self-contained true -p:Publ
 
 Run `publish/DiogenesImGui.exe` and keep `glfw3.dll` and `cimgui.dll` next to it. `DiogenesImGui.exe --demo` opens a small made-up ECU to try the interface without a CBF file.
 
+On a Mac, `mac/build-app.sh` builds `publish-mac/Diogenes.app` for Apple silicon (`mac/build-app.sh osx-x64` for Intel), and `dotnet run --project DiogenesImGui -- --demo` runs it straight from the source.
+
 CBF and CFF files are Mercedes-Benz data and are not included.
 
 ## Status
 
-The CBF browsing and translation are tested with a real CBF file. Connecting, running commands, reading coding and memory, and flashing are ported from Diogenes II but have not yet been tested on a car. Flashing is experimental, as in the original.
+The CBF browsing and translation are tested with a real CBF file. On an M-chip Mac the connection code (J2534 driver, ISO-TP filter, UDS session, multi-frame replies) is tested against the openport-j2534 driver talking to its cable simulator, not yet against a real cable and car. Connecting, running commands, reading coding and memory, and flashing are ported from Diogenes II but have not yet been tested on a car. Flashing is experimental, as in the original.
 
 ## License
 

@@ -54,11 +54,16 @@ namespace SAE.J2534
         private object sync = new object();
         private IntPtr pLibrary;
         internal API_Signature APISignature { get; }
-        internal API(string FileName)
+        /// <summary>
+        /// Size of the driver's 'unsigned long' in bytes, which sets the layout of PASSTHRU_MSG and SCONFIG
+        /// </summary>
+        public int LongSize { get; }
+        internal API(string FileName, int LongSize)
         {
             APISignature = new API_Signature();
+            this.LongSize = LongSize;
 
-            pLibrary = Kernal32.LoadLibrary(FileName);
+            pLibrary = NativeLoader.Load(FileName);
 
             APISignature = AssignDelegates();
         }
@@ -139,7 +144,7 @@ namespace SAE.J2534
         }
         protected override void DisposeUnmanaged()
         {
-            Kernal32.FreeLibrary(pLibrary);
+            NativeLoader.Free(pLibrary);
         }
     }
 }

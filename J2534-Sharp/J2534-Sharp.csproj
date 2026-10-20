@@ -5,7 +5,8 @@
     <RootNamespace>J2534_Sharp</RootNamespace>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+  <!-- x86 only on Windows, where the drivers are 32-bit; Mac and Linux drivers match the machine (arm64 on M chips) -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU' And $([MSBuild]::IsOSPlatform('Windows'))">
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
 

@@ -30,7 +30,7 @@ namespace SAE.J2534
         public IntPtr Ptr { get; }
         public HeapIntPtr()
         {
-            Ptr = Marshal.AllocHGlobal(4);
+            Ptr = Marshal.AllocHGlobal(IntPtr.Size);
         }
         public static explicit operator IntPtr(HeapIntPtr HeapIntPtr)
         {

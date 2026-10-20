@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace Diogenes.UI
 {
     // Native Windows open/save dialogs (comdlg32). Used instead of WinForms so the app doesn't need
-    // the whole Windows Desktop runtime just to pick a file.
+    // the whole Windows Desktop runtime just to pick a file. On a Mac the native dialogs are shown through osascript.
     public static class FileDialogs
     {
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -76,6 +78,10 @@ namespace Diogenes.UI
 
         static List<string> Show(string title, string filter, string defaultName, bool save, bool multi)
         {
+            if (OperatingSystem.IsMacOS())
+            {
+                return ShowMac(title, defaultName, save, multi);
+            }
             var result = new List<string>();
             IntPtr buffer = Marshal.AllocCoTaskMem(BufferChars * 2);
             try
@@ -141,6 +147,72 @@ namespace Diogenes.UI
             finally
             {
                 Marshal.FreeCoTaskMem(buffer);
+            }
+        }
+
+        // the file type filter is left out: CBF files have no registered macOS file type, so the dialog
+        // would grey them out, and the file is checked when it is opened anyway
+        static List<string> ShowMac(string title, string defaultName, bool save, bool multi)
+        {
+            string script;
+            if (save)
+            {
+                script = $"POSIX path of (choose file name with prompt {Quote(title)}" +
+                         (string.IsNullOrEmpty(defaultName) ? "" : $" default name {Quote(defaultName)}") + ")";
+            }
+            else if (multi)
+            {
+                script = $"set picked to (choose file with prompt {Quote(title)} with multiple selections allowed)\n" +
+                         "set out to \"\"\n" +
+                         "repeat with f in picked\n set out to out & POSIX path of f & linefeed\nend repeat\n" +
+                         "return out";
+            }
+            else
+            {
+                script = $"POSIX path of (choose file with prompt {Quote(title)})";
+            }
+            // a cancelled dialog exits with an error and no output, which gives an empty list
+            string output = RunAppleScript(script) ?? "";
+            return output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+        }
+
+        // shows a simple message box, used for crash reports where ImGui may no longer be drawing
+        public static void Alert(string title, string message)
+        {
+            if (OperatingSystem.IsMacOS())
+            {
+                RunAppleScript($"display alert {Quote(title)} message {Quote(message)} as critical");
+            }
+        }
+
+        static string Quote(string text)
+        {
+            return "\"" + text.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+        }
+
+        static string RunAppleScript(string script)
+        {
+            try
+            {
+                var info = new ProcessStartInfo("/usr/bin/osascript")
+                {
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                };
+                using var process = Process.Start(info);
+                // the dialog would otherwise open behind the app window
+                process.StandardInput.Write("activate\n" + script);
+                process.StandardInput.Close();
+                string output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit();
+                return process.ExitCode == 0 ? output : null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Could not show the dialog: {ex.Message}");
+                return null;
             }
         }
     }

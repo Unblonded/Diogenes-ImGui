@@ -51,48 +51,41 @@ namespace SAE.J2534
 {
     public partial class API
     {
-        internal PassThruConnect PTConnect = delegate (int DeviceID, int ProtocolID, int ConnectFlags, int Baud, IntPtr ChannelID) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruDisconnect PTDisconnect = delegate (int channelId) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruReadMsgs PTReadMsgs = delegate (int ChannelID, IntPtr pMsgArray, IntPtr NumMsgs, int Timeout) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruWriteMsgs PTWriteMsgs = delegate (int ChannelID, IntPtr pMsgArray, IntPtr NumMsgs, int Timeout) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruStartPeriodicMsg PTStartPeriodicMsg = delegate (int ChannelID, IntPtr pMsg, IntPtr MsgID, int Interval) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruStopPeriodicMsg PTStopPeriodicMsg = delegate (int ChannelID, int MsgID) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruStartMsgFilter PTStartMsgFilter = delegate (
-            int ChannelID,
-            int FilterType,
-            IntPtr pMaskMsg,
-            IntPtr pPatternMsg,
-            IntPtr pFlowControlMsg,
-            IntPtr FilterID
-        ) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruStopMsgFilter PTStopMsgFilter = delegate (int ChannelID, int FilterID) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruSetProgrammingVoltage PTSetProgrammingVoltage = delegate (int DeviceID, int Pin, int Voltage) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruReadVersion PTReadVersion = delegate (int DeviceID, IntPtr pFirmwareVer, IntPtr pDllVer, IntPtr pAPIVer) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruGetLastError PTGetLastError = delegate (IntPtr pErr) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruIoctl PTIoctl = delegate (int HandleID, int IoctlID, IntPtr Input, IntPtr Output) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruConnect PTConnect = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruDisconnect PTDisconnect = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruReadMsgs PTReadMsgs = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruWriteMsgs PTWriteMsgs = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruStartPeriodicMsg PTStartPeriodicMsg = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruStopPeriodicMsg PTStopPeriodicMsg = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruStartMsgFilter PTStartMsgFilter = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruStopMsgFilter PTStopMsgFilter = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruSetProgrammingVoltage PTSetProgrammingVoltage = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruReadVersion PTReadVersion = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruGetLastError PTGetLastError = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruIoctl PTIoctl = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
         //v2.02
-        internal PassThruConnectv202 PTConnectv202 = delegate (int ProtocolID, int ConnectFlags, IntPtr ChannelID) { return ResultCode.FUNCTION_NOT_ASSIGNED; } ;
-        internal PassThruSetProgrammingVoltagev202 PTSetProgrammingVoltagev202 = delegate (int Pin, int Voltage) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruReadVersionv202 PTReadVersionv202 = delegate (IntPtr pFirmwareVer, IntPtr pDllVer, IntPtr pAPIVer) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruConnectv202 PTConnectv202 = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; } ;
+        internal PassThruSetProgrammingVoltagev202 PTSetProgrammingVoltagev202 = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruReadVersionv202 PTReadVersionv202 = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
         //v4.04
-        internal PassThruOpen PTOpen = delegate (IntPtr pDeviceName, IntPtr DeviceID) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruClose PTClose = delegate (int DeviceID) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruOpen PTOpen = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruClose PTClose = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
         //v5.00 and undocumented Drewtech calls
-        internal PassThruScanForDevices PTScanForDevices = delegate (ref int DeviceCount) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruGetNextDevice PTGetNextDevice = delegate (IntPtr pSDevice) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruLogicalConnect PTLogicalConnect = delegate (int PhysicalChannelID, int ProtocolID, int ConnectFlags, IntPtr ChannelDescriptor, ref int pChannelID) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruLogicalDisconnect PTLogicalDisconnect = delegate (int pChannelID) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruSelect PTSelect = delegate (IntPtr pSChannelSet, int SelectType, int Timeout) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
-        internal PassThruQueueMsgs PTQueueMsgs = delegate (int ChannelID, IntPtr pMsgArray, ref int NumMsgs) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruScanForDevices PTScanForDevices = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruGetNextDevice PTGetNextDevice = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruLogicalConnect PTLogicalConnect = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruLogicalDisconnect PTLogicalDisconnect = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruSelect PTSelect = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruQueueMsgs PTQueueMsgs = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
         //Drewtech ONLY
-        internal PassThruGetNextCarDAQ PTGetNextCarDAQ = delegate (IntPtr pName, IntPtr pVer, IntPtr pAddress) { return ResultCode.FUNCTION_NOT_ASSIGNED; };
+        internal PassThruGetNextCarDAQ PTGetNextCarDAQ = delegate { return ResultCode.FUNCTION_NOT_ASSIGNED; };
 
         private API_Signature AssignDelegates()
         {
             if (pLibrary == IntPtr.Zero)
                 return APISignature;
 
-            IntPtr pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruOpen");
+            IntPtr pFunction = NativeLoader.GetExport(pLibrary, "PassThruOpen");
             if (pFunction != IntPtr.Zero)
             {
                 PTOpen = Marshal.GetDelegateForFunctionPointer<PassThruOpen>(pFunction);
@@ -101,7 +94,7 @@ namespace SAE.J2534
             else
                 PTOpen = Open_shim;
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruClose");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruClose");
             if (pFunction != IntPtr.Zero)
             {
                 PTClose = Marshal.GetDelegateForFunctionPointer<PassThruClose>(pFunction);
@@ -110,7 +103,7 @@ namespace SAE.J2534
             else
                 PTClose = Close_shim;
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruConnect");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruConnect");
             if (pFunction != IntPtr.Zero)
             {
                 //If the API is v4.04 (because it has 'PassThruOpen')
@@ -126,56 +119,56 @@ namespace SAE.J2534
                 APISignature.SAE_API |= SAE_API.CONNECT;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruDisconnect");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruDisconnect");
             if (pFunction != IntPtr.Zero)
             {
                 PTDisconnect = Marshal.GetDelegateForFunctionPointer<PassThruDisconnect>(pFunction);
                 APISignature.SAE_API |= SAE_API.DISCONNECT;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruReadMsgs");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruReadMsgs");
             if (pFunction != IntPtr.Zero)
             {
                 PTReadMsgs = Marshal.GetDelegateForFunctionPointer<PassThruReadMsgs>(pFunction);
                 APISignature.SAE_API |= SAE_API.READMSGS;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruWriteMsgs");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruWriteMsgs");
             if (pFunction != IntPtr.Zero)
             {
                 PTWriteMsgs = Marshal.GetDelegateForFunctionPointer<PassThruWriteMsgs>(pFunction);
                 APISignature.SAE_API |= SAE_API.WRITEMSGS;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruStartPeriodicMsg");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruStartPeriodicMsg");
             if (pFunction != IntPtr.Zero)
             {
                 PTStartPeriodicMsg = Marshal.GetDelegateForFunctionPointer<PassThruStartPeriodicMsg>(pFunction);
                 APISignature.SAE_API |= SAE_API.STARTPERIODICMSG;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruStopPeriodicMsg");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruStopPeriodicMsg");
             if (pFunction != IntPtr.Zero)
             {
                 PTStopPeriodicMsg = Marshal.GetDelegateForFunctionPointer<PassThruStopPeriodicMsg>(pFunction);
                 APISignature.SAE_API |= SAE_API.STOPPERIODICMSG;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruStartMsgFilter");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruStartMsgFilter");
             if (pFunction != IntPtr.Zero)
             {
                 PTStartMsgFilter = Marshal.GetDelegateForFunctionPointer<PassThruStartMsgFilter>(pFunction);
                 APISignature.SAE_API |= SAE_API.STARTMSGFILTER;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruStopMsgFilter");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruStopMsgFilter");
             if (pFunction != IntPtr.Zero)
             {
                 PTStopMsgFilter = Marshal.GetDelegateForFunctionPointer<PassThruStopMsgFilter>(pFunction);
                 APISignature.SAE_API |= SAE_API.STOPMSGFILTER;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruSetProgrammingVoltage");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruSetProgrammingVoltage");
             if (pFunction != IntPtr.Zero)
             {
                 //If the API is v4.04 (because it has 'PassThruOpen')
@@ -191,7 +184,7 @@ namespace SAE.J2534
                 APISignature.SAE_API |= SAE_API.SETPROGRAMMINGVOLTAGE;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruReadVersion");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruReadVersion");
             if (pFunction != IntPtr.Zero)
             {
                 //If the API is v4.04 (because it has 'PassThruOpen')
@@ -207,14 +200,14 @@ namespace SAE.J2534
                 APISignature.SAE_API |= SAE_API.READVERSION;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruGetLastError");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruGetLastError");
             if (pFunction != IntPtr.Zero)
             {
                 PTGetLastError = Marshal.GetDelegateForFunctionPointer<PassThruGetLastError>(pFunction);
                 APISignature.SAE_API |= SAE_API.GETLASTERROR;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruIoctl");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruIoctl");
             if (pFunction != IntPtr.Zero)
             {
                 PTIoctl = Marshal.GetDelegateForFunctionPointer<PassThruIoctl>(pFunction);
@@ -222,49 +215,49 @@ namespace SAE.J2534
             }
 
             //v5.00
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruScanForDevices");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruScanForDevices");
             if (pFunction != IntPtr.Zero)
             {
                 PTScanForDevices = Marshal.GetDelegateForFunctionPointer<PassThruScanForDevices>(pFunction);
                 APISignature.SAE_API |= SAE_API.SCANFORDEVICES;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruGetNextDevice");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruGetNextDevice");
             if (pFunction != IntPtr.Zero)
             {
                 PTGetNextDevice = Marshal.GetDelegateForFunctionPointer<PassThruGetNextDevice>(pFunction);
                 APISignature.SAE_API |= SAE_API.GETNEXTDEVICE;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruLogicalConnect");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruLogicalConnect");
             if (pFunction != IntPtr.Zero)
             {
                 PTLogicalConnect = Marshal.GetDelegateForFunctionPointer<PassThruLogicalConnect>(pFunction);
                 APISignature.SAE_API |= SAE_API.LOGICALCONNECT;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruLogicalDisconnect");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruLogicalDisconnect");
             if (pFunction != IntPtr.Zero)
             {
                 PTLogicalDisconnect = Marshal.GetDelegateForFunctionPointer<PassThruLogicalDisconnect>(pFunction);
                 APISignature.SAE_API |= SAE_API.LOGICALDISCONNECT;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruSelect");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruSelect");
             if (pFunction != IntPtr.Zero)
             {
                 PTSelect = Marshal.GetDelegateForFunctionPointer<PassThruSelect>(pFunction);
                 APISignature.SAE_API |= SAE_API.SELECT;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruQueueMsgs");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruQueueMsgs");
             if (pFunction != IntPtr.Zero)
             {
                 PTQueueMsgs = Marshal.GetDelegateForFunctionPointer<PassThruQueueMsgs>(pFunction);
                 APISignature.SAE_API |= SAE_API.QUEUEMESSAGES;
             }
 
-            pFunction = Kernal32.GetProcAddress(pLibrary, "PassThruGetNextCarDAQ");
+            pFunction = NativeLoader.GetExport(pLibrary, "PassThruGetNextCarDAQ");
             if (pFunction != IntPtr.Zero)
             {
                 PTGetNextCarDAQ = Marshal.GetDelegateForFunctionPointer<PassThruGetNextCarDAQ>(pFunction);

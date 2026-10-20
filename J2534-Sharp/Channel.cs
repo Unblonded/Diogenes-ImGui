@@ -47,7 +47,7 @@ namespace SAE.J2534
         {
             sync = Sync;
             channelId = ChannelID;
-            hJ2534MessageArray = new HeapMessageArray(ProtocolID, CONST.HEAPMESSAGEBUFFERSIZE);
+            hJ2534MessageArray = new HeapMessageArray(ProtocolID, CONST.HEAPMESSAGEBUFFERSIZE, Device.API.LongSize);
             API = Device.API;
             this.Device = Device;
             this.ProtocolID = ProtocolID;
@@ -170,7 +170,7 @@ namespace SAE.J2534
         public int StartPeriodicMessage(PeriodicMessage PeriodicMessage, Protocol PeriodicMessageProtocolID)
         {
             using (HeapInt hMessageID = new HeapInt())
-            using(HeapMessage hPeriodicMessage = new HeapMessage(PeriodicMessageProtocolID, PeriodicMessage))
+            using(HeapMessage hPeriodicMessage = new HeapMessage(PeriodicMessageProtocolID, PeriodicMessage, API.LongSize))
             {
                 lock (sync)
                 {
@@ -215,9 +215,9 @@ namespace SAE.J2534
         public int StartMsgFilter(MessageFilter Filter, Protocol FilterProtocolID)
         {
             using (HeapInt hFilterID = new HeapInt())
-            using (HeapMessage hMask = new HeapMessage(FilterProtocolID, Filter.TxFlags, Filter.Mask))
-            using (HeapMessage hPattern = new HeapMessage(FilterProtocolID, Filter.TxFlags, Filter.Pattern))
-            using (HeapMessage hFlowControl = new HeapMessage(FilterProtocolID, Filter.TxFlags, Filter.FlowControl))
+            using (HeapMessage hMask = new HeapMessage(FilterProtocolID, Filter.TxFlags, Filter.Mask, API.LongSize))
+            using (HeapMessage hPattern = new HeapMessage(FilterProtocolID, Filter.TxFlags, Filter.Pattern, API.LongSize))
+            using (HeapMessage hFlowControl = new HeapMessage(FilterProtocolID, Filter.TxFlags, Filter.FlowControl, API.LongSize))
             {
                 lock (sync)
                 {
@@ -267,7 +267,7 @@ namespace SAE.J2534
         /// <returns>Parameter value</returns>
         public int GetConfig(Parameter Parameter)
         {
-            using (HeapSConfigArray hSConfigArray = new HeapSConfigArray(new SConfig(Parameter, 0)))
+            using (HeapSConfigArray hSConfigArray = new HeapSConfigArray(new SConfig(Parameter, 0), API.LongSize))
             {
                 lock (sync)
                 {
@@ -283,7 +283,7 @@ namespace SAE.J2534
         /// <param name="Value">Parameter value</param>
         public void SetConfig(Parameter Parameter, int Value)
         {
-            using (HeapSConfigArray hSConfigList = new HeapSConfigArray(new SConfig(Parameter, Value)))
+            using (HeapSConfigArray hSConfigList = new HeapSConfigArray(new SConfig(Parameter, Value), API.LongSize))
             {
                 lock (sync)
                 {
@@ -298,7 +298,7 @@ namespace SAE.J2534
         /// <returns>Parameter list</returns>
         public SConfig[] GetConfig(SConfig[] SConfig)
         {
-            using (HeapSConfigArray hSConfigArray = new HeapSConfigArray(SConfig))
+            using (HeapSConfigArray hSConfigArray = new HeapSConfigArray(SConfig, API.LongSize))
             {
                 lock (sync)
                 {
@@ -313,7 +313,7 @@ namespace SAE.J2534
         /// <param name="Parameter">List of parameters to set</param>
         public void SetConfig(SConfig[] SConfig)
         {
-            using (HeapSConfigArray hSConfigList = new HeapSConfigArray(SConfig))
+            using (HeapSConfigArray hSConfigList = new HeapSConfigArray(SConfig, API.LongSize))
             {
                 lock (sync)
                 {
@@ -378,7 +378,7 @@ namespace SAE.J2534
         /// <param name="Addr">Address to pass</param>
         public void AddToFunctMsgLookupTable(byte Addr)
         {
-            using (HeapSByteArray hSByteArray = new HeapSByteArray(Addr))
+            using (HeapSByteArray hSByteArray = new HeapSByteArray(Addr, API.LongSize))
             {
                 lock (sync)
                 {
@@ -392,7 +392,7 @@ namespace SAE.J2534
         /// <param name="AddressList">Address list to pass</param>
         public void AddToFunctMsgLookupTable(List<byte> AddressList)
         {
-            using (HeapSByteArray hSByteArray = new HeapSByteArray(AddressList.ToArray()))
+            using (HeapSByteArray hSByteArray = new HeapSByteArray(AddressList.ToArray(), API.LongSize))
             {
                 lock (sync)
                 {
@@ -406,7 +406,7 @@ namespace SAE.J2534
         /// <param name="Addr">Address to remove</param>
         public void DeleteFromFunctMsgLookupTable(byte Addr)
         {
-            using (HeapSByteArray hSByteArray = new HeapSByteArray(Addr))
+            using (HeapSByteArray hSByteArray = new HeapSByteArray(Addr, API.LongSize))
             {
                 lock (sync)
                 {
@@ -420,7 +420,7 @@ namespace SAE.J2534
         /// <param name="AddressList">Address list to stop</param>
         public void DeleteFromFunctMsgLookupTable(IEnumerable<byte> AddressList)
         {
-            using (HeapSByteArray hSByteArray = new HeapSByteArray(AddressList.ToArray()))
+            using (HeapSByteArray hSByteArray = new HeapSByteArray(AddressList.ToArray(), API.LongSize))
             {
                 lock (sync)
                 {
@@ -435,8 +435,8 @@ namespace SAE.J2534
         /// <returns>byte[2]</returns>
         public byte[] FiveBaudInit(byte TargetAddress)
         {
-            using (HeapSByteArray hInput = new HeapSByteArray(new byte[] { TargetAddress }))
-            using (HeapSByteArray hOutput = new HeapSByteArray(new byte[2]))
+            using (HeapSByteArray hInput = new HeapSByteArray(new byte[] { TargetAddress }, API.LongSize))
+            using (HeapSByteArray hOutput = new HeapSByteArray(new byte[2], API.LongSize))
             {
                 lock (sync)
                 {
@@ -452,8 +452,8 @@ namespace SAE.J2534
         /// <returns></returns>
         public Message FastInit(Message TxMessage)
         {
-            using (HeapMessage hInput = new HeapMessage(ProtocolID, TxMessage.TxFlags, TxMessage.Data))
-            using (HeapMessage hOutput = new HeapMessage(ProtocolID))
+            using (HeapMessage hInput = new HeapMessage(ProtocolID, TxMessage.TxFlags, TxMessage.Data, API.LongSize))
+            using (HeapMessage hOutput = new HeapMessage(ProtocolID, API.LongSize))
             {
                 lock (sync)
                 {

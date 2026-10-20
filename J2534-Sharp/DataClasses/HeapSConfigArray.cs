@@ -20,6 +20,7 @@
 *SOFTWARE.
 */
 #endregion License
+
 using System;
 using System.Runtime.InteropServices;
 
@@ -27,11 +28,14 @@ namespace SAE.J2534
 {
     internal class HeapSConfigArray : HeapStructArray<SConfig>
     {
-        public HeapSConfigArray(SConfig SConfig) : base(SConfig)
+        public HeapSConfigArray(SConfig SConfig, int LongSize) : base(SConfig, LongSize)
         {
         }
-        public HeapSConfigArray(SConfig[] SConfigList) : base(SConfigList)
+        public HeapSConfigArray(SConfig[] SConfigList, int LongSize) : base(SConfigList, LongSize)
         {
         }
+        protected override int FieldCount => 2;
+        protected override int[] ToFields(SConfig Element) => new[] { (int)Element.Parameter, Element.Value };
+        protected override SConfig FromFields(int[] Fields) => new SConfig((Parameter)Fields[0], Fields[1]);
     }
 }

@@ -36,4 +36,32 @@ namespace SAE.J2534
         [DllImport("kernel32.dll")]
         public static extern bool FreeLibrary(IntPtr pLibrary);
     }
+
+    // LoadLibrary on Windows (as before), dlopen through NativeLibrary on macOS and Linux
+    internal static class NativeLoader
+    {
+        public static IntPtr Load(string Library)
+        {
+            if (OperatingSystem.IsWindows())
+                return Kernal32.LoadLibrary(Library);
+            return NativeLibrary.TryLoad(Library, out IntPtr handle) ? handle : IntPtr.Zero;
+        }
+
+        public static IntPtr GetExport(IntPtr pLibrary, string FunctionName)
+        {
+            if (OperatingSystem.IsWindows())
+                return Kernal32.GetProcAddress(pLibrary, FunctionName);
+            return NativeLibrary.TryGetExport(pLibrary, FunctionName, out IntPtr address) ? address : IntPtr.Zero;
+        }
+
+        public static void Free(IntPtr pLibrary)
+        {
+            if (pLibrary == IntPtr.Zero)
+                return;
+            if (OperatingSystem.IsWindows())
+                Kernal32.FreeLibrary(pLibrary);
+            else
+                NativeLibrary.Free(pLibrary);
+        }
+    }
 }

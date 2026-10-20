@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using Diogenes.Translation;
@@ -52,6 +52,11 @@ namespace Diogenes
             options.Position = new Vector2D<int>((screenWidth - width) / 2, (screenHeight - height) / 2);
             options.Title = "Diogenes II";
             options.VSync = true;
+            if (OperatingSystem.IsMacOS())
+            {
+                // macOS only offers OpenGL 3.2+ as a forward compatible core profile
+                options.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.ForwardCompatible, new APIVersion(3, 3));
+            }
 
             using var window = Window.Create(options);
 
@@ -65,11 +70,17 @@ namespace Diogenes
                 gl = window.CreateOpenGL();
                 input = window.CreateInput();
 
-                // Segoe UI reads much better than the built-in pixel font and covers German umlauts
-                string fontPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "segoeui.ttf");
-                if (File.Exists(fontPath))
+                // on Retina screens the framebuffer has more pixels than the window has points
+                if (window.Size.X > 0)
                 {
-                    int baseSize = (int)Math.Round(18 * Widgets.UiScale);
+                    Fonts.RasterScale = Math.Max(1f, (float)window.FramebufferSize.X / window.Size.X);
+                }
+
+                // Segoe UI (Helvetica Neue on a Mac) reads much better than the built-in pixel font and covers German umlauts
+                string fontPath = Fonts.MainFontPath;
+                if (fontPath != null)
+                {
+                    int baseSize = (int)Math.Round(18 * Widgets.UiScale * Fonts.RasterScale);
                     controller = new ImGuiController(gl, window, input, new ImGuiFontConfig(fontPath, baseSize), () =>
                     {
                         ConfigureIO();
@@ -123,6 +134,15 @@ namespace Diogenes
         // so a 4K screen gets big enough text even when Windows scaling is left at 100%.
         static (int width, int height) DetectUiScale()
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                // macOS already works in points that are scaled for the screen, Retina sharpness comes from Fonts.RasterScale
+                var mode = Silk.NET.Windowing.Monitor.GetMainMonitor(null)?.VideoMode;
+                var resolution = mode?.Resolution ?? new Vector2D<int>(1440, 900);
+                Widgets.UiScale = 1f;
+                Console.WriteLine($"Screen {resolution.X}x{resolution.Y} points");
+                return (resolution.X, resolution.Y);
+            }
             int width = 1920;
             int height = 1080;
             float dpiScale = 1f;
@@ -159,7 +179,15 @@ namespace Diogenes
             {
                 // nothing else we can do
             }
-            MessageBoxW(IntPtr.Zero, $"Diogenes crashed:\n\n{ex?.Message}\n\nDetails were saved to {path}", "Diogenes", 0x10);
+            string message = $"Diogenes crashed:\n\n{ex?.Message}\n\nDetails were saved to {path}";
+            if (OperatingSystem.IsWindows())
+            {
+                MessageBoxW(IntPtr.Zero, message, "Diogenes", 0x10);
+            }
+            else if (OperatingSystem.IsMacOS())
+            {
+                FileDialogs.Alert("Diogenes crashed", message);
+            }
         }
 
         static void ConfigureIO()

@@ -20,32 +20,37 @@
 *SOFTWARE.
 */
 #endregion License
+
 using System;
 using System.Runtime.InteropServices;
 
 namespace SAE.J2534
 {
+    /// <summary>
+    /// SBYTE_ARRAY: {unsigned long NumOfBytes; unsigned char* BytePtr} followed by the bytes
+    /// </summary>
     internal class HeapSByteArray : Common.UnmanagedDisposable
     {
+        private readonly int longSize;
+        private readonly int dataOffset;
         public IntPtr Ptr { get; }
-        public HeapSByteArray(byte Byte)
+        public HeapSByteArray(byte Byte, int LongSize) : this(new byte[] { Byte }, LongSize)
         {
-            Ptr = Marshal.AllocHGlobal(9);
-            Length = 1;
-            Marshal.WriteIntPtr(Ptr, 4, IntPtr.Add(Ptr, 8));
-            Marshal.WriteByte(IntPtr.Add(Ptr, 8), Byte);
         }
-        public HeapSByteArray(byte[] SByteArray)
+        public HeapSByteArray(byte[] SByteArray, int LongSize)
         {
-            Ptr = Marshal.AllocHGlobal(SByteArray.Length + 8);
+            longSize = LongSize;
+            dataOffset = NativeLong.ListPointerOffset(LongSize) + IntPtr.Size;
+            Ptr = Marshal.AllocHGlobal(SByteArray.Length + dataOffset);
+            Marshal.WriteInt64(Ptr, 0);
             Length = SByteArray.Length;
-            Marshal.WriteIntPtr(Ptr, 4, IntPtr.Add(Ptr, 8));
-            Marshal.Copy(SByteArray, 0, IntPtr.Add(Ptr, 8), SByteArray.Length);
+            Marshal.WriteIntPtr(Ptr, NativeLong.ListPointerOffset(LongSize), IntPtr.Add(Ptr, dataOffset));
+            Marshal.Copy(SByteArray, 0, IntPtr.Add(Ptr, dataOffset), SByteArray.Length);
         }
         public int Length
         {
-            get { return Marshal.ReadInt32(Ptr); }
-            private set { Marshal.WriteInt32(Ptr, value); }
+            get { return NativeLong.Read(Ptr, 0, longSize); }
+            private set { NativeLong.Write(Ptr, 0, longSize, value); }
         }
 
         public byte this[int Index]
@@ -53,13 +58,13 @@ namespace SAE.J2534
             get
             {
                 if (Index >= Length || Index < 0) throw new IndexOutOfRangeException("Index is greater than array bound");
-                return Marshal.ReadByte(IntPtr.Add(Ptr, Index + 8));                
+                return Marshal.ReadByte(IntPtr.Add(Ptr, Index + dataOffset));                
             }
         }
         public byte[] ToSByteArray()
         {
             byte[] result = new byte[Length];
-            Marshal.Copy(IntPtr.Add(Ptr, 8), result, 0, result.Length);
+            Marshal.Copy(IntPtr.Add(Ptr, dataOffset), result, 0, result.Length);
             return result;
 
         }

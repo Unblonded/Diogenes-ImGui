@@ -20,6 +20,7 @@
 *SOFTWARE.
 */
 #endregion License
+
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -28,16 +29,19 @@ namespace SAE.J2534
 {
     internal class HeapMessage : Common.UnmanagedDisposable
     {
-        public IntPtr Ptr { get; } = Marshal.AllocHGlobal(CONST.J2534MESSAGESIZE);
+        private readonly int longSize;
+        public IntPtr Ptr { get; }
 
-        public HeapMessage(Protocol ProtocolID)
+        public HeapMessage(Protocol ProtocolID, int LongSize)
         {
+            longSize = LongSize;
+            Ptr = Marshal.AllocHGlobal(NativeLong.MessageSize(LongSize));
             this.ProtocolID = ProtocolID;
         }
-        public HeapMessage(Protocol ProtocolID, Message Message) : this(ProtocolID, Message.TxFlags, Message.Data)
+        public HeapMessage(Protocol ProtocolID, Message Message, int LongSize) : this(ProtocolID, Message.TxFlags, Message.Data, LongSize)
         {
         }
-        public HeapMessage(Protocol ProtocolID, TxFlag TxFlags, IEnumerable<byte> Data) : this(ProtocolID)
+        public HeapMessage(Protocol ProtocolID, TxFlag TxFlags, IEnumerable<byte> Data, int LongSize) : this(ProtocolID, LongSize)
         {
             this.TxFlags = TxFlags;
             this.Data = Data;
@@ -50,49 +54,49 @@ namespace SAE.J2534
 
         public Protocol ProtocolID
         {
-            get { return (Protocol)Marshal.ReadInt32(Ptr); }
-            set { Marshal.WriteInt32(Ptr, (int)value); }
+            get { return (Protocol)NativeLong.Read(Ptr, 0, longSize); }
+            set { NativeLong.Write(Ptr, 0, longSize, (int)value); }
         }
         public RxFlag RxStatus
         {
-            get { return (RxFlag)Marshal.ReadInt32(Ptr, 4); }
-            set { Marshal.WriteInt32(Ptr, 4, (int)value); }
+            get { return (RxFlag)NativeLong.Read(Ptr, longSize, longSize); }
+            set { NativeLong.Write(Ptr, longSize, longSize, (int)value); }
         }
         public TxFlag TxFlags
         {
-            get { return (TxFlag)Marshal.ReadInt32(Ptr, 8); }
-            set { Marshal.WriteInt32(Ptr, 8, (int)value); }
+            get { return (TxFlag)NativeLong.Read(Ptr, longSize * 2, longSize); }
+            set { NativeLong.Write(Ptr, longSize * 2, longSize, (int)value); }
         }
         public uint Timestamp
         {
-            get { return (uint)Marshal.ReadInt32(Ptr, 12); }
-            set { Marshal.WriteInt32(Ptr, 12, (int)value); }
+            get { return (uint)NativeLong.Read(Ptr, longSize * 3, longSize); }
+            set { NativeLong.Write(Ptr, longSize * 3, longSize, (int)value); }
         }
         public uint ExtraDataIndex
         {
-            get { return (uint)Marshal.ReadInt32(Ptr, 20); }
-            set { Marshal.WriteInt32(Ptr, 20, (int)value); }
+            get { return (uint)NativeLong.Read(Ptr, longSize * 5, longSize); }
+            set { NativeLong.Write(Ptr, longSize * 5, longSize, (int)value); }
         }
         public int Length
         {
-            get { return Marshal.ReadInt32(Ptr, 16); }
+            get { return NativeLong.Read(Ptr, longSize * 4, longSize); }
             private set
             {
-                if (value > CONST.J2534MESSAGESIZE) throw new ArgumentException("Message Data.Length is greater than fixed maximum");
-                Marshal.WriteInt32(Ptr, 16, value);
+                if (value > NativeLong.MessageSize(longSize)) throw new ArgumentException("Message Data.Length is greater than fixed maximum");
+                NativeLong.Write(Ptr, longSize * 4, longSize, value);
             }
         }
         public IEnumerable<byte> Data
         {
             get
             {
-                byte[] data = new byte[Marshal.ReadInt32(Ptr, 16)];
-                Marshal.Copy(IntPtr.Add(Ptr, 24), data, 0, data.Length);
+                byte[] data = new byte[Length];
+                Marshal.Copy(IntPtr.Add(Ptr, NativeLong.MessageDataOffset(longSize)), data, 0, data.Length);
                 return data;
             }
             set
             {
-                IntPtr DataPtr = IntPtr.Add(Ptr, 24);  //Offset to data array
+                IntPtr DataPtr = IntPtr.Add(Ptr, NativeLong.MessageDataOffset(longSize));  //Offset to data array
                 if (value is byte[])  //Byte[] is fastest
                 {
                     var ValueAsArray = (byte[])value;

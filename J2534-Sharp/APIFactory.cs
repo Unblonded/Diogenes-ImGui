@@ -25,6 +25,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Win32;
 
 namespace SAE.J2534
@@ -39,13 +40,20 @@ namespace SAE.J2534
         /// <returns>JManaged 2534API</returns>
         public static API GetAPI(string Filename)
         {
+            return GetAPI(Filename, APIInfo.DefaultLongSize);
+        }
+        /// <summary>
+        /// Loads an API whose 'unsigned long' is LongSize bytes, verifies its signature and returns the managed wrapper
+        /// </summary>
+        public static API GetAPI(string Filename, int LongSize)
+        {
             lock (Cache)
             {
                 if (!Cache.ContainsKey(Filename))
                 {
                     if (!File.Exists(Filename)) throw new DllNotFoundException($"DLL Not Found! {Filename}");
 
-                    var API = new API(Filename);
+                    var API = new API(Filename, LongSize);
                     if (API.APISignature.SAE_API != SAE_API.V202_SIGNATURE &&
                         API.APISignature.SAE_API != SAE_API.V404_SIGNATURE &&
                         API.APISignature.SAE_API != SAE_API.V500_SIGNATURE)
@@ -62,10 +70,76 @@ namespace SAE.J2534
         }
 
         /// <summary>
-        /// Queries the registry for registered J2534 API's
+        /// Lists the J2534 API's installed on this computer: the registry on Windows, driver JSON files and
+        /// known library locations on macOS and Linux
         /// </summary>
         /// <returns>APIInfo enumerable</returns>
         public static IEnumerable<APIInfo> GetAPIinfo()
+        {
+            return OperatingSystem.IsWindows() ? GetRegistryAPIinfo() : GetUnixAPIinfo();
+        }
+
+        // Libraries that install to a fixed place without a JSON file, e.g. the open source Tactrix OpenPort 2.0
+        // driver (github.com/bisak/openport-j2534), which Homebrew puts in /opt/homebrew/lib on Apple silicon
+        private static readonly (string Name, string Filename)[] KnownUnixLibraries =
+        {
+            ("Tactrix OpenPort 2.0", "/opt/homebrew/lib/libj2534.dylib"),
+            ("Tactrix OpenPort 2.0", "/usr/local/lib/libj2534.dylib"),
+            ("Tactrix OpenPort 2.0", "/usr/local/lib/libj2534.so"),
+            ("Tactrix OpenPort 2.0", "/usr/lib/libj2534.so"),
+        };
+
+        /// <summary>
+        /// On macOS and Linux there is no registry. Drivers describe themselves in ~/.passthru/*.json
+        /// (the convention of the Macchina and OpenVehicleDiag drivers, which use 32-bit integers), and a
+        /// few libraries are looked for where their installers put them.
+        /// </summary>
+        private static IEnumerable<APIInfo> GetUnixAPIinfo()
+        {
+            var result = new List<APIInfo>();
+            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string jsonFolder = Path.Combine(home, ".passthru");
+            if (Directory.Exists(jsonFolder))
+            {
+                foreach (string jsonPath in Directory.GetFiles(jsonFolder, "*.json").OrderBy(x => x))
+                {
+                    try
+                    {
+                        using var json = JsonDocument.Parse(File.ReadAllText(jsonPath));
+                        var root = json.RootElement;
+                        string library = root.TryGetProperty("FUNCTION_LIB", out var lib) ? lib.GetString() : null;
+                        if (String.IsNullOrWhiteSpace(library)) continue;
+                        if (library.StartsWith("~/")) library = Path.Combine(home, library.Substring(2));
+
+                        string name = root.TryGetProperty("NAME", out var n) ? n.GetString() : Path.GetFileNameWithoutExtension(jsonPath);
+                        var details = new StringBuilder();
+                        if (root.TryGetProperty("VENDOR", out var vendor)) details.AppendLine($"Vendor: {vendor.GetString()}");
+                        // optional: "LONG_SIZE": 8 for a driver built with C 'unsigned long'
+                        int longSize = root.TryGetProperty("LONG_SIZE", out var size) && size.TryGetInt32(out int s) && (s == 4 || s == 8) ? s : 4;
+                        result.Add(new APIInfo(name, library, details.ToString(), longSize));
+                    }
+                    catch (Exception)
+                    {
+                        //a broken file only hides that one driver
+                    }
+                }
+            }
+            foreach (var known in KnownUnixLibraries)
+            {
+                if (File.Exists(known.Filename) && !result.Any(x => x.Filename == known.Filename))
+                {
+                    result.Add(new APIInfo(known.Name, known.Filename, "", APIInfo.DefaultLongSize));
+                    break;
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Queries the registry for registered J2534 API's
+        /// </summary>
+        [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+        private static IEnumerable<APIInfo> GetRegistryAPIinfo()
         {
             Dictionary<string, string> DetailOptions = new Dictionary<string, string>();
             DetailOptions.Add("CAN", "CAN Bus");

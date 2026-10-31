@@ -189,6 +189,11 @@ namespace Diogenes.UI
         {
             if (Simulate)
             {
+                if (ClearFaultsPending)
+                {
+                    ClearFaultsPending = false;
+                    Faults = new FaultMemoryReader.Result();
+                }
                 SimulateReadings();
                 return;
             }
@@ -355,6 +360,17 @@ namespace Diogenes.UI
             }, quiet: true);
         }
 
+        void AskClearFaults()
+        {
+            // always answer the click: faults stay listed after disconnecting
+            if (!App.Connected && !Simulate)
+            {
+                App.ShowMessage("Not connected", "These faults were read earlier. Connect to the car to erase them.");
+                return;
+            }
+            App.ConfirmDangerous("Erase all fault codes?", $"This erases the stored fault codes and their freeze frame data from {(Slots.Count > 1 ? $"all {Slots.Count} control units" : "this control unit")}. Faults that are still present will come back.", () => ClearFaultsPending = true);
+        }
+
         // erases the fault memory of every connected ECU, then reads it back so the list shows what's left
         void ClearFaults()
         {
@@ -369,7 +385,7 @@ namespace Diogenes.UI
                     string error;
                     try
                     {
-                        error = FaultMemoryReader.Clear(slot.Channel, slot.Ecu);
+                        error = FaultMemoryReader.Clear(slot.Channel);
                     }
                     catch (Exception ex)
                     {
@@ -383,11 +399,9 @@ namespace Diogenes.UI
                 }
             }, () =>
             {
+                // reported by SetFaults, once we know what's left
+                ClearErrors = errors;
                 ReadFaultsPending = true;
-                if (errors.Count > 0)
-                {
-                    App.ShowMessage("Some fault codes were not erased", string.Join("\n", errors));
-                }
             });
         }
 
@@ -423,6 +437,9 @@ namespace Diogenes.UI
 
         // ECUs whose fault memory couldn't be read, shown next to the results
         List<string> FaultErrors = new List<string>();
+
+        // ECUs that refused the last erase, null when no erase is waiting to be reported
+        List<string> ClearErrors = null;
 
         void SetFaults(List<(EcuSlot slot, FaultMemoryReader.Result result)> perEcu)
         {
@@ -463,6 +480,27 @@ namespace Diogenes.UI
                     Console.WriteLine($"  {f.EcuName} {f.Code}{(f.Active ? " (active)" : "")}: {f.Meaning ?? "not listed in the CBF"}");
                 }
             }
+            if (ClearErrors != null)
+            {
+                ReportClear(faults);
+                ClearErrors = null;
+            }
+        }
+
+        void ReportClear(FaultMemoryReader.Result left)
+        {
+            var lines = new List<string>(ClearErrors);
+            if (left.Error != null)
+            {
+                lines.Add($"Couldn't read the fault memory back: {left.Error}");
+            }
+            else if (left.Faults.Count > 0)
+            {
+                lines.Add($"{left.Faults.Count} fault(s) are stored after the erase. Those came straight back, so the problem is probably still there:");
+                lines.AddRange(left.Faults.Select(f => $"{f.EcuName} {f.Code}"));
+            }
+            App.ShowMessage(ClearErrors.Count > 0 ? "Some fault codes were not erased" : "Fault codes erased",
+                lines.Count > 0 ? string.Join("\n", lines) : "No faults are stored any more.");
         }
 
         // ------------------------------------------------------------ evaluation
@@ -919,12 +957,6 @@ namespace Diogenes.UI
                     {
                         ShowFaultList = !ShowFaultList;
                     }
-                    ImGui.SameLine();
-                    if (Widgets.Button("Erase", App.Connected && !ClearFaultsPending, "Connect to the car first (step 3 at the top)"))
-                    {
-                        App.ConfirmDangerous("Erase all fault codes?", $"This erases the stored fault codes and their freeze frame data from {(Slots.Count > 1 ? $"all {Slots.Count} control units" : "this control unit")}. Faults that are still present will come back.", () => ClearFaultsPending = true);
-                    }
-                    Widgets.Tooltip("Erase the stored fault codes");
                 }
             });
 
@@ -943,6 +975,14 @@ namespace Diogenes.UI
             float height = Math.Min(Widgets.S(320), rowHeight * (Faults.Faults.Count + 1) + ImGui.GetStyle().WindowPadding.Y * 2 + ImGui.GetTextLineHeightWithSpacing() * 2);
             Widgets.BeginCard("faultlist_card", new Vector2(0, height));
             Widgets.SectionTitle(Icons.Warning, "Stored faults");
+            float eraseWidth = Widgets.S(110);
+            ImGui.SameLine();
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X - eraseWidth);
+            if (Widgets.ColoredButton("Erase all", Theme.Bad, new Vector2(eraseWidth, 0)))
+            {
+                AskClearFaults();
+            }
+            Widgets.Tooltip("Erase the stored fault codes");
             if (ImGui.BeginTable("faultlist", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.ScrollY))
             {
                 ImGui.TableSetupScrollFreeze(0, 1);

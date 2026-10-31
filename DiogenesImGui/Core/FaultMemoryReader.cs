@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Caesar;
+using CaesarConnection.Protocol;
 using Diogenes.Translation;
 
 namespace Diogenes
@@ -27,30 +28,8 @@ namespace Diogenes
             public string Error;
         }
 
-        // KWP ECUs (older Mercedes) list 0x18 services in their CBF, UDS ones list 0x19
-        static bool UsesKwp(ECU ecu)
-        {
-            bool kwp = false;
-            foreach (var ds in ecu.GlobalDiagServices)
-            {
-                if (ds?.RequestBytes is null || ds.RequestBytes.Length == 0)
-                {
-                    continue;
-                }
-                if (ds.RequestBytes[0] == 0x19)
-                {
-                    return false;
-                }
-                if (ds.RequestBytes[0] == 0x18)
-                {
-                    kwp = true;
-                }
-            }
-            return kwp;
-        }
-
         // runs on a background thread
-        public static Result Read(CaesarConnection.Protocol.BaseProtocol channel, ECU ecu, IEnumerable<DTC> knownCodes)
+        public static Result Read(BaseProtocol channel, ECU ecu, IEnumerable<DTC> knownCodes)
         {
             var result = new Result();
             if (channel is null)
@@ -58,7 +37,8 @@ namespace Diogenes
                 result.Error = "Not connected";
                 return result;
             }
-            bool kwp = UsesKwp(ecu);
+            // CBFs often don't list the fault services at all, so go by the protocol we connected with
+            bool kwp = channel is KW2C3PE;
             byte[] request = kwp ? new byte[] { 0x18, 0x02, 0xFF, 0x00 } : new byte[] { 0x19, 0x02, 0xFF };
             byte[] response = channel.Send(request, true);
 
@@ -136,13 +116,13 @@ namespace Diogenes
 
         // erases every stored fault in this ECU (UDS 14 FF FF FF / KWP 14 FF 00), returns null when it worked
         // runs on a background thread
-        public static string Clear(CaesarConnection.Protocol.BaseProtocol channel, ECU ecu)
+        public static string Clear(BaseProtocol channel)
         {
             if (channel is null)
             {
                 return "Not connected";
             }
-            byte[] request = UsesKwp(ecu) ? new byte[] { 0x14, 0xFF, 0x00 } : new byte[] { 0x14, 0xFF, 0xFF, 0xFF };
+            byte[] request = channel is KW2C3PE ? new byte[] { 0x14, 0xFF, 0x00 } : new byte[] { 0x14, 0xFF, 0xFF, 0xFF };
             byte[] response = channel.Send(request, true);
 
             if (response is null || response.Length == 0)

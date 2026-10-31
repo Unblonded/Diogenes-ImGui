@@ -1175,6 +1175,8 @@ namespace Diogenes.UI
                 ImGui.OpenPopup("##message");
                 OpenMessagePopup = false;
             }
+            // ImGui clears this every frame the popup is closed, and a false here closes the popup right as it opens
+            PopupOpenDummy = true;
             ImGui.SetNextWindowSize(new Vector2(Widgets.S(520), 0));
             if (ImGui.BeginPopupModal("##message", ref PopupOpenDummy, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoTitleBar))
             {
@@ -1194,6 +1196,7 @@ namespace Diogenes.UI
                 ImGui.OpenPopup("##confirm");
                 OpenConfirmPopup = false;
             }
+            PopupOpenDummy = true;
             ImGui.SetNextWindowSize(new Vector2(Widgets.S(560), 0));
             if (ImGui.BeginPopupModal("##confirm", ref PopupOpenDummy, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoTitleBar))
             {

@@ -91,6 +91,7 @@ namespace Diogenes.UI
         bool ReadInfoPending = false;
         bool ReadOncePending = false;
         bool ReadFaultsPending = false;
+        bool ClearFaultsPending = false;
         DateTime NextPoll = DateTime.MinValue;
         DateTime LastPoll = DateTime.MinValue;
         int LastPollErrors = 0;
@@ -219,7 +220,11 @@ namespace Diogenes.UI
                 return;
             }
             // button presses wait for the current live read to finish instead of being refused
-            if (ReadInfoPending || ReadOncePending || ReadFaultsPending || (Live && DateTime.Now >= NextPoll))
+            if (ClearFaultsPending)
+            {
+                ClearFaults();
+            }
+            else if (ReadInfoPending || ReadOncePending || ReadFaultsPending || (Live && DateTime.Now >= NextPoll))
             {
                 Poll(ReadInfoPending || ReadOncePending, ReadInfoPending || ReadFaultsPending);
             }
@@ -348,6 +353,42 @@ namespace Diogenes.UI
                     SetFaults(faults);
                 }
             }, quiet: true);
+        }
+
+        // erases the fault memory of every connected ECU, then reads it back so the list shows what's left
+        void ClearFaults()
+        {
+            ClearFaultsPending = false;
+            var slots = Slots.ToList();
+            var errors = new List<string>();
+
+            App.RunBackground("Erasing fault codes", () =>
+            {
+                foreach (var slot in slots)
+                {
+                    string error;
+                    try
+                    {
+                        error = FaultMemoryReader.Clear(slot.Channel, slot.Ecu);
+                    }
+                    catch (Exception ex)
+                    {
+                        error = ex.Message;
+                    }
+                    Console.WriteLine($"Erase fault codes on {slot.Name}: {error ?? "done"}");
+                    if (error != null)
+                    {
+                        errors.Add($"{slot.Name}: {error}");
+                    }
+                }
+            }, () =>
+            {
+                ReadFaultsPending = true;
+                if (errors.Count > 0)
+                {
+                    App.ShowMessage("Some fault codes were not erased", string.Join("\n", errors));
+                }
+            });
         }
 
         void Apply(Tile tile, Reading reading)
@@ -863,7 +904,7 @@ namespace Diogenes.UI
                 }
                 ImGui.PopStyleColor();
                 Fonts.Pop();
-                Widgets.Tooltip(Faults?.Error ?? "Faults stored in this ECU (read only, nothing is cleared)");
+                Widgets.Tooltip(Faults?.Error ?? "Faults stored in this ECU");
 
                 ImGui.SameLine();
                 if (Widgets.Button(Icons.Refresh, App.Connected && !ReadFaultsPending, "Connect to the car first (step 3 at the top)"))
@@ -878,6 +919,12 @@ namespace Diogenes.UI
                     {
                         ShowFaultList = !ShowFaultList;
                     }
+                    ImGui.SameLine();
+                    if (Widgets.Button("Erase", App.Connected && !ClearFaultsPending, "Connect to the car first (step 3 at the top)"))
+                    {
+                        App.ConfirmDangerous("Erase all fault codes?", $"This erases the stored fault codes and their freeze frame data from {(Slots.Count > 1 ? $"all {Slots.Count} control units" : "this control unit")}. Faults that are still present will come back.", () => ClearFaultsPending = true);
+                    }
+                    Widgets.Tooltip("Erase the stored fault codes");
                 }
             });
 

@@ -7,7 +7,7 @@ using Diogenes.Translation;
 namespace Diogenes
 {
     // Reads the ECU's stored fault codes with the standard request (UDS 19 02 / KWP 18 02)
-    // and looks their meaning up in the CBF. Read only, never clears anything.
+    // and looks their meaning up in the CBF. Read never clears anything, only Clear does.
     public static class FaultMemoryReader
     {
         public class Fault
@@ -132,6 +132,29 @@ namespace Diogenes
                 result.Error = $"Unexpected answer: {BitUtility.BytesToHex(response, true)}";
             }
             return result;
+        }
+
+        // erases every stored fault in this ECU (UDS 14 FF FF FF / KWP 14 FF 00), returns null when it worked
+        // runs on a background thread
+        public static string Clear(CaesarConnection.Protocol.BaseProtocol channel, ECU ecu)
+        {
+            if (channel is null)
+            {
+                return "Not connected";
+            }
+            byte[] request = UsesKwp(ecu) ? new byte[] { 0x14, 0xFF, 0x00 } : new byte[] { 0x14, 0xFF, 0xFF, 0xFF };
+            byte[] response = channel.Send(request, true);
+
+            if (response is null || response.Length == 0)
+            {
+                return "No answer from the ECU";
+            }
+            if (response[0] == 0x7F)
+            {
+                byte code = response.Length > 2 ? response[2] : (byte)0;
+                return $"The ECU refused: {ServiceCategories.NegativeResponseMeaning(code)}";
+            }
+            return response[0] == 0x54 ? null : $"Unexpected answer: {BitUtility.BytesToHex(response, true)}";
         }
 
         // first two bytes as an SAE code, e.g. 01 28 -> P0128

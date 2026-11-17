@@ -55,7 +55,6 @@ namespace Diogenes.UI
         bool OpenConfirmPopup = false;
         string ConfirmYesLabel = "Yes, continue";
         bool ConfirmFinalStep = false;
-        double ConfirmUnlockTime = 0;
 
         bool PopupOpenDummy = true;
         bool ShowQuickStart = false;
@@ -160,8 +159,8 @@ namespace Diogenes.UI
             OpenConfirmPopup = true;
         }
 
-        // for anything that changes the car: asks once, then a second time with the buttons swapped and
-        // the yes button locked for a few seconds, so a quick double-click can't get through both
+        // for anything that changes the car: asks once, then a second time with the buttons swapped
+        // so a quick double-click can't get through both
         public void ConfirmDangerous(string title, string body, Action onYes)
         {
             Confirm(title, body, () =>
@@ -171,7 +170,6 @@ namespace Diogenes.UI
                 ConfirmAction = onYes;
                 ConfirmYesLabel = "Yes, send it";
                 ConfirmFinalStep = true;
-                ConfirmUnlockTime = ImGui.GetTime() + 3;
                 OpenConfirmPopup = true;
             });
         }
@@ -1210,14 +1208,12 @@ namespace Diogenes.UI
                 ImGui.Spacing();
 
                 bool yes = false, cancel = false;
-                double wait = ConfirmUnlockTime - ImGui.GetTime();
                 if (ConfirmFinalStep)
                 {
                     // cancel where "yes" was on the first dialog
                     cancel = ImGui.Button("Cancel", new Vector2(Widgets.S(160), 0));
                     ImGui.SameLine();
-                    string label = wait > 0 ? $"{ConfirmYesLabel} ({Math.Ceiling(wait)})" : ConfirmYesLabel;
-                    yes = Widgets.PrimaryButton($"{label}##yes", Theme.Bad, new Vector2(Widgets.S(200), 0), wait <= 0);
+                    yes = Widgets.PrimaryButton($"{ConfirmYesLabel}##yes", Theme.Bad, new Vector2(Widgets.S(200), 0));
                 }
                 else
                 {

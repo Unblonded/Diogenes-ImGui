@@ -114,7 +114,7 @@ namespace Diogenes
             return result;
         }
 
-        // erases every stored fault in this ECU (UDS 14 FF FF FF / KWP 14 FF 00), returns null when it worked
+        // erases every stored and pending fault in this ECU (UDS 14 FF FF FF / KWP 14 FF 00), returns null when it worked
         // runs on a background thread
         public static string Clear(BaseProtocol channel)
         {
@@ -134,7 +134,28 @@ namespace Diogenes
                 byte code = response.Length > 2 ? response[2] : (byte)0;
                 return $"The ECU refused: {ServiceCategories.NegativeResponseMeaning(code)}";
             }
-            return response[0] == 0x54 ? null : $"Unexpected answer: {BitUtility.BytesToHex(response, true)}";
+            if (response[0] != 0x54)
+            {
+                return $"Unexpected answer: {BitUtility.BytesToHex(response, true)}";
+            }
+            if (!(channel is KW2C3PE))
+            {
+                ClearObd(channel);
+            }
+            return null;
+        }
+
+        // some engine ECUs keep emission related pending codes until they get the OBD-II clear (service 04).
+        // ECUs without OBD just refuse it, so this only logs and never fails the erase
+        static void ClearObd(BaseProtocol channel)
+        {
+            byte[] response = channel.Send(new byte[] { 0x04 }, true);
+            string outcome = response is null || response.Length == 0 ? "no answer"
+                : response[0] == 0x44 ? "done"
+                : response[0] == 0x7F && response.Length > 2 && response[2] == 0x11 ? "not used by this ECU"
+                : response[0] == 0x7F && response.Length > 2 ? $"refused: {ServiceCategories.NegativeResponseMeaning(response[2])}"
+                : $"unexpected answer {BitUtility.BytesToHex(response, true)}";
+            Console.WriteLine($"  OBD-II clear (service 04): {outcome}");
         }
 
         // first two bytes as an SAE code, e.g. 01 28 -> P0128

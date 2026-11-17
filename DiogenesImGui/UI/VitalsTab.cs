@@ -368,7 +368,7 @@ namespace Diogenes.UI
                 App.ShowMessage("Not connected", "These faults were read earlier. Connect to the car to erase them.");
                 return;
             }
-            App.ConfirmDangerous("Erase all fault codes?", $"This erases the stored fault codes and their freeze frame data from {(Slots.Count > 1 ? $"all {Slots.Count} control units" : "this control unit")}. Faults that are still present will come back.", () => ClearFaultsPending = true);
+            App.ConfirmDangerous("Erase all fault codes?", $"This erases the stored and pending fault codes and their freeze frame data from {(Slots.Count > 1 ? $"all {Slots.Count} control units" : "this control unit")}. Faults that are still present will come back.", () => ClearFaultsPending = true);
         }
 
         // erases the fault memory of every connected ECU, then reads it back so the list shows what's left
@@ -496,8 +496,12 @@ namespace Diogenes.UI
             }
             else if (left.Faults.Count > 0)
             {
-                lines.Add($"{left.Faults.Count} fault(s) are stored after the erase. Those came straight back, so the problem is probably still there:");
-                lines.AddRange(left.Faults.Select(f => $"{f.EcuName} {f.Code}"));
+                lines.Add($"{left.Faults.Count} fault(s) are back after the erase, so the problem is probably still there:");
+                lines.AddRange(left.Faults.Select(f => $"{f.EcuName} {f.Code} ({(f.Active ? "active" : f.Pending ? "pending" : "stored")})"));
+                if (left.Faults.Any(f => f.Pending))
+                {
+                    lines.Add("Pending means the ECU saw the problem again since the erase. It goes away by itself if the problem doesn't come back over the next drive cycles.");
+                }
             }
             App.ShowMessage(ClearErrors.Count > 0 ? "Some fault codes were not erased" : "Fault codes erased",
                 lines.Count > 0 ? string.Join("\n", lines) : "No faults are stored any more.");
@@ -982,7 +986,7 @@ namespace Diogenes.UI
             {
                 AskClearFaults();
             }
-            Widgets.Tooltip("Erase the stored fault codes");
+            Widgets.Tooltip("Erase the stored and pending fault codes");
             if (ImGui.BeginTable("faultlist", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.ScrollY))
             {
                 ImGui.TableSetupScrollFreeze(0, 1);
